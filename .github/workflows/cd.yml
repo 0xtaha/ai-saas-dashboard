@@ -1,0 +1,226 @@
+name: CD - Deploy to Azure AKS
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+  AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          else
+            TAG=main-${GITHUB_SHA::8}
+          fi
+          echo "tags=$TAG" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:${{ env.IMAGE_TAG }}
+            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:latest
+          cache-from: type=registry,ref=${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:latest
+          cache-to: type=inline
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:${{ env.IMAGE_TAG }}
+            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:latest
+          cache-from: type=registry,ref=${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:latest
+          cache-to: type=inline
+
+      - name: Scan Backend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'backend-trivy-results.sarif'
+
+      - name: Scan Frontend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'frontend-trivy-results.sarif'
+
+  deploy-to-aks:
+    name: Deploy to AKS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'prod' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment
+        id: set-env
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" != "" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            ENV="prod"
+          else
+            ENV="staging"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "DEPLOY_ENV=$ENV" >> $GITHUB_ENV
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.AKS_RESOURCE_GROUP }} \
+            --name ${{ env.AKS_CLUSTER_NAME }} \
+            --overwrite-existing
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace ai-saas-dashboard --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create/Update secrets
+        run: |
+          kubectl create secret generic app-secrets \
+            --from-literal=SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            --from-literal=JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+            --from-literal=AI_API_KEY="${{ secrets.AI_API_KEY }}" \
+            --from-literal=AI_API_URL="${{ secrets.AI_API_URL }}" \
+            --namespace=ai-saas-dashboard \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to AKS
+        run: |
+          export IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
+          export AZURE_CONTAINER_REGISTRY="${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io"
+
+          # Apply base configurations
+          envsubst < k8s/base/configmap.yaml | kubectl apply -f -
+          envsubst < k8s/base/postgres-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/base/redis-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/base/backend-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/base/frontend-deployment.yaml | kubectl apply -f -
+
+          # Apply ingress if production
+          if [[ "${{ env.DEPLOY_ENV }}" == "prod" ]]; then
+            envsubst < k8s/base/ingress.yaml | kubectl apply -f -
+          fi
+
+      - name: Wait for deployment
+        run: |
+          kubectl rollout status deployment/backend -n ai-saas-dashboard --timeout=5m
+          kubectl rollout status deployment/frontend -n ai-saas-dashboard --timeout=5m
+
+      - name: Run database migrations
+        run: |
+          POD=$(kubectl get pod -n ai-saas-dashboard -l app=backend -o jsonpath="{.items[0].metadata.name}")
+          kubectl exec -n ai-saas-dashboard $POD -- python scripts/init_db.py || true
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n ai-saas-dashboard
+          kubectl get services -n ai-saas-dashboard
+          kubectl get ingress -n ai-saas-dashboard
+
+      - name: Send deployment notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Deployment to ${{ env.DEPLOY_ENV }} ${{ job.status }}
+            Image Tag: ${{ needs.build-and-push.outputs.image_tag }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  rollback:
+    name: Rollback Deployment
+    needs: [build-and-push, deploy-to-aks]
+    if: failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.AKS_RESOURCE_GROUP }} \
+            --name ${{ env.AKS_CLUSTER_NAME }} \
+            --overwrite-existing
+
+      - name: Rollback Backend
+        run: |
+          kubectl rollout undo deployment/backend -n ai-saas-dashboard
+
+      - name: Rollback Frontend
+        run: |
+          kubectl rollout undo deployment/frontend -n ai-saas-dashboard
+
+      - name: Verify rollback
+        run: |
+          kubectl rollout status deployment/backend -n ai-saas-dashboard
+          kubectl rollout status deployment/frontend -n ai-saas-dashboard

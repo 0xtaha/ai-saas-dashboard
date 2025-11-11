@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-saas-dashboard
+  labels:
+    name: ai-saas-dashboard
+    environment: production
