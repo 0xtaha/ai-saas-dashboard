@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: app-backend
+spec:
+  template:
+    spec:
+      containers:
+      - name: backend
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: azure-services-secrets
+              key: AZURE_POSTGRES_HOST
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: azure-services-secrets
+              key: AZURE_POSTGRES_PASSWORD
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: azure-services-secrets
+              key: AZURE_REDIS_HOST
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: azure-services-secrets
+              key: AZURE_REDIS_KEY
+        - name: REDIS_SSL
+          value: "true"

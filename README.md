@@ -1,369 +1,312 @@
 # AI SaaS Dashboard
 
-A full-stack AI-powered file processing platform with a React frontend and Flask backend.
+A production-ready, enterprise-grade AI-powered file processing platform with multi-deployment support for Azure managed services and on-premise infrastructure.
 
-## Features
+## 🌟 Features
 
-- **User Authentication** - Secure JWT-based authentication
-- **File Upload** - Drag-and-drop file uploads with checksum-based deduplication
-- **AI Processing** - Automatic file processing with AI integration
-- **Results Visualization** - Interactive display of processing results
-- **File Management** - List, view, and delete uploaded files
-- **Processing History** - Track all AI processing requests
+- **User Authentication** - Secure JWT-based authentication with session management
+- **File Upload** - Drag-and-drop file uploads with SHA-256 checksum-based deduplication
+- **AI Processing** - Automatic file processing with AI integration and status tracking
+- **Results Visualization** - Interactive display of processing results with mock data fallback
+- **File Management** - List, view, and delete uploaded files with pagination
+- **Multi-Namespace Architecture** - Separate namespaces for backend, frontend, and monitoring
+- **Dual Deployment Modes** - Support for both Azure managed services and on-premise deployments
+- **Comprehensive Monitoring** - Fluent Bit + Prometheus + Azure Log Analytics
+- **CI/CD Pipeline** - GitHub Actions with automated deployment to Azure AKS
+- **Infrastructure as Code** - Complete Terraform configuration for Azure resources
 
-## Tech Stack
+## 🏗️ Architecture
 
-### Frontend
-- React 18
-- React Router 6
-- Axios
-- CSS3
-- Nginx (for production)
+### Deployment Modes
 
-### Backend
-- Flask 3.0
-- SQLAlchemy
-- PostgreSQL
-- JWT Authentication
-- Flask-CORS
-- Flask-Migrate
+#### Azure Managed Services Mode
+- **Azure Kubernetes Service (AKS)** - Container orchestration
+- **Azure Database for PostgreSQL Flexible Server** - Managed database with HA
+- **Azure Cache for Redis Premium** - Managed caching with clustering
+- **Azure Container Registry** - Private container registry
+- **Azure Log Analytics** - Centralized logging and monitoring
+- **Cost:** ~$1,140/month
 
-### Infrastructure
-- Docker & Docker Compose
-- Redis (for caching)
-- Nginx (frontend hosting)
+#### On-Premise Mode
+- **Azure Kubernetes Service (AKS)** - Container orchestration
+- **PostgreSQL in AKS** - Self-hosted database with persistent volumes
+- **Redis in AKS** - Self-hosted cache
+- **Azure Container Registry** - Private container registry
+- **Azure Log Analytics** - Centralized logging and monitoring
+- **Cost:** ~$490/month
 
-## Project Structure
+### Tech Stack
+
+**Frontend**
+- React 18 with React Router 6
+- Axios for API communication
+- Context API for state management
+- Nginx for production hosting
+- Responsive design with CSS3
+
+**Backend**
+- Flask 3.0 with SQLAlchemy ORM
+- PostgreSQL 15 with connection pooling
+- Redis for caching and sessions
+- JWT authentication with Flask-JWT-Extended
+- Flask-Migrate for database migrations
+- Gunicorn WSGI server
+
+**Infrastructure**
+- Kubernetes 1.28 on Azure AKS
+- Docker multi-stage builds
+- Helm charts for package management
+- Kustomize for environment-specific configs
+- Terraform for infrastructure provisioning
+
+**Monitoring & Observability**
+- Fluent Bit for log aggregation
+- Prometheus for metrics collection
+- Azure Log Analytics for centralized logs
+- Application Insights for APM
+- Grafana dashboards (optional)
+
+## 📁 Project Structure
 
 ```
 ai-saas-dashboard/
-├── frontend/                   # React frontend application
+├── frontend/                       # React frontend application
 │   ├── src/
-│   │   ├── components/        # React components
-│   │   ├── pages/             # Page components
-│   │   ├── services/          # API services
-│   │   ├── contexts/          # React contexts
-│   │   └── styles/            # CSS files
-│   ├── public/
-│   ├── Dockerfile             # Frontend Docker config
-│   ├── nginx.conf             # Nginx configuration
+│   │   ├── components/            # Reusable components
+│   │   │   ├── FileUpload.js
+│   │   │   ├── FileList.js
+│   │   │   └── ProcessingResults.js
+│   │   ├── pages/                 # Page components
+│   │   │   ├── Dashboard.js
+│   │   │   ├── Login.js
+│   │   │   └── Register.js
+│   │   ├── services/              # API service layer
+│   │   ├── contexts/              # React contexts
+│   │   └── styles/                # CSS modules
+│   ├── Dockerfile                 # Multi-stage build
+│   ├── nginx.conf                 # Nginx configuration
 │   └── package.json
 │
-├── backend/                    # Flask backend API
+├── backend/                        # Flask backend API
 │   ├── app/
-│   │   ├── models/            # Database models
-│   │   ├── routes/            # API endpoints
-│   │   ├── services/          # Business logic
-│   │   ├── utils/             # Utilities
-│   │   └── middleware/        # Middleware
-│   ├── uploaded_files/        # File storage
-│   ├── Dockerfile             # Backend Docker config
+│   │   ├── models/                # SQLAlchemy models
+│   │   │   ├── user.py
+│   │   │   ├── file.py
+│   │   │   └── ai_request.py
+│   │   ├── routes/                # API endpoints
+│   │   │   ├── auth.py
+│   │   │   ├── files.py
+│   │   │   └── health.py
+│   │   ├── services/              # Business logic
+│   │   │   ├── file_service.py
+│   │   │   └── ai_service.py
+│   │   ├── utils/                 # Utility functions
+│   │   └── middleware/            # Custom middleware
+│   ├── uploaded_files/            # File storage directory
+│   ├── Dockerfile
 │   └── requirements.txt
 │
-├── docker-compose.yml         # Docker Compose configuration
-├── .env.example               # Environment variables template
-└── README.md                  # This file
+├── k8s/                            # Kubernetes manifests
+│   ├── namespaces/
+│   │   └── namespaces.yaml        # 3 namespaces definition
+│   ├── base/                      # Base manifests
+│   │   ├── backend-deployment.yaml
+│   │   ├── frontend-deployment.yaml
+│   │   ├── postgres-deployment.yaml
+│   │   ├── redis-deployment.yaml
+│   │   └── ingress.yaml
+│   ├── overlays/                  # Environment overlays
+│   │   ├── azure/                 # Azure managed services
+│   │   │   ├── backend-config.yaml
+│   │   │   ├── backend-patch.yaml
+│   │   │   └── kustomization.yaml
+│   │   └── onprem/                # On-premise mode
+│   │       ├── backend-config.yaml
+│   │       └── kustomization.yaml
+│   └── monitoring/                # Monitoring stack
+│       ├── fluent-bit/
+│       │   ├── configmap.yaml
+│       │   ├── daemonset.yaml
+│       │   └── rbac.yaml
+│       └── prometheus/
+│           ├── configmap.yaml
+│           ├── deployment.yaml
+│           ├── rbac.yaml
+│           └── servicemonitors.yaml
+│
+├── infra/                          # Infrastructure as Code
+│   └── terraform/
+│       ├── main.tf                # Provider configuration
+│       ├── variables.tf           # Input variables
+│       ├── outputs.tf             # Output values
+│       ├── aks.tf                 # AKS cluster
+│       ├── postgres.tf            # Azure PostgreSQL
+│       ├── redis.tf               # Azure Redis
+│       ├── monitoring.tf          # Log Analytics, App Insights
+│       ├── networking.tf          # VNet, subnets, NSG
+│       └── README.md              # Terraform documentation
+│
+├── .github/                        # GitHub Actions workflows
+│   └── workflows/
+│       ├── ci.yml                 # Continuous Integration
+│       └── cd.yml                 # Continuous Deployment
+│
+├── scripts/                        # Deployment scripts
+│   └── deploy/
+│       ├── create-secrets.sh      # Create K8s secrets
+│       ├── deploy-manual.sh       # Manual deployment
+│       ├── deploy-with-mode.sh    # Mode-aware deployment
+│       └── setup-azure.sh         # Azure resource setup
+│
+├── docker-compose.yml             # Local development
+├── docker-compose.prod.yml        # Production overrides
+├── DEPLOYMENT_MODES.md            # Deployment modes guide
+├── QUICK_START.md                 # Quick start guide
+├── NAMESPACE_ARCHITECTURE.md      # Multi-namespace docs
+├── CICD_README.md                 # CI/CD documentation
+└── README.md                      # This file
 ```
 
-## Quick Start with Docker
+## 🚀 Quick Start
 
 ### Prerequisites
-- Docker
-- Docker Compose
+- Azure CLI (`az`)
+- Terraform (>= 1.5.0)
+- kubectl
+- Docker & Docker Compose
+- Git
 
-### 1. Clone the repository
+### Option 1: Terraform Deployment (Recommended)
 
 ```bash
+# 1. Clone repository
 git clone <repository-url>
 cd ai-saas-dashboard
+
+# 2. Configure Terraform
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+
+# Edit terraform.tfvars - set deployment_mode to "azure" or "onprem"
+nano terraform.tfvars
+
+# 3. Deploy infrastructure
+terraform init
+terraform plan
+terraform apply
+
+# 4. Get AKS credentials
+az aks get-credentials \
+  --resource-group $(terraform output -raw resource_group_name) \
+  --name $(terraform output -raw aks_cluster_name)
+
+# 5. Deploy application
+cd ../../scripts/deploy
+./deploy-with-mode.sh azure  # or onprem
 ```
 
-### 2. Set up environment variables
+### Option 2: Local Development with Docker Compose
 
 ```bash
+# 1. Clone and setup
+git clone <repository-url>
+cd ai-saas-dashboard
 cp .env.example .env
-```
 
-Edit `.env` and configure your settings:
-```env
-SECRET_KEY=your-secret-key-here
-JWT_SECRET_KEY=your-jwt-secret-key-here
-AI_API_URL=https://your-ai-api-url
-AI_API_KEY=your-ai-api-key
-```
+# 2. Edit .env with your configuration
 
-### 3. Build and run with Docker Compose
-
-```bash
+# 3. Start services
 docker-compose up --build
+
+# 4. Initialize database
+docker-compose exec backend python scripts/init_db.py
 ```
 
-This will start:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5000
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
+Access the application:
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:5000/api
+- **API Docs:** http://localhost:5000/api/docs
 
-### 4. Access the application
+## 📚 Documentation
 
-Open your browser and navigate to:
-```
-http://localhost:3000
-```
+- **[Quick Start Guide](QUICK_START.md)** - Get started quickly with common commands
+- **[Deployment Modes](DEPLOYMENT_MODES.md)** - Detailed comparison and setup for both modes
+- **[Terraform Infrastructure](infra/terraform/README.md)** - Infrastructure as Code documentation
+- **[Namespace Architecture](NAMESPACE_ARCHITECTURE.md)** - Multi-namespace design and patterns
+- **[CI/CD Pipeline](CICD_README.md)** - GitHub Actions workflow documentation
 
-### 5. Initialize the database
+## 🔧 Configuration
 
-On first run, initialize the database:
+### Environment Variables
 
-```bash
-# Enter the backend container
-docker-compose exec backend bash
+#### Backend Configuration
 
-# Run database initialization
-python scripts/init_db.py
-
-# Exit container
-exit
-```
-
-## Development Setup (Without Docker)
-
-### Backend Setup
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your configuration
-
-# Initialize database
-python scripts/init_db.py
-
-# Run development server
-python run.py
-```
-
-Backend runs on: http://localhost:5000
-
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your configuration
-
-# Run development server
-npm start
-```
-
-Frontend runs on: http://localhost:3000
-
-## Docker Commands
-
-### Start all services
-```bash
-docker-compose up
-```
-
-### Start in detached mode
-```bash
-docker-compose up -d
-```
-
-### Rebuild containers
-```bash
-docker-compose up --build
-```
-
-### Stop all services
-```bash
-docker-compose down
-```
-
-### Stop and remove volumes
-```bash
-docker-compose down -v
-```
-
-### View logs
-```bash
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f frontend
-docker-compose logs -f backend
-```
-
-### Execute commands in containers
-```bash
-# Backend shell
-docker-compose exec backend bash
-
-# Frontend shell
-docker-compose exec frontend sh
-
-# Database shell
-docker-compose exec db psql -U postgres -d ai_saas
-```
-
-### Rebuild specific service
-```bash
-docker-compose up --build frontend
-docker-compose up --build backend
-```
-
-## API Documentation
-
-### Authentication Endpoints
-
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `POST /api/auth/logout` - Logout user
-- `GET /api/auth/profile` - Get user profile
-
-### File Endpoints
-
-- `POST /api/files/upload` - Upload file
-- `GET /api/files/` - List files (paginated)
-- `GET /api/files/:checksum` - Get file details
-- `DELETE /api/files/:checksum` - Delete file
-- `GET /api/files/:checksum/processing-status` - Get processing status
-
-### Health Check
-
-- `GET /api/health/` - Health check
-- `GET /api/health/ready` - Readiness check
-
-## Environment Variables
-
-### Backend (`backend/.env`)
+**Azure Mode:**
 ```env
-FLASK_ENV=development
-FLASK_DEBUG=True
-SECRET_KEY=your-secret-key
-JWT_SECRET_KEY=your-jwt-secret-key
-DATABASE_URL=postgresql://user:password@localhost:5432/ai_saas
-AI_API_URL=https://api.example.com/v1/messages
-AI_API_KEY=your-ai-api-key
-MAX_CONTENT_LENGTH=16777216
+DATABASE_HOST=<server>.postgres.database.azure.com
+DATABASE_PORT=5432
+DATABASE_SSL_MODE=require
+REDIS_HOST=<cache>.redis.cache.windows.net
+REDIS_PORT=6380
+REDIS_SSL=true
 ```
 
-### Frontend (`frontend/.env`)
+**On-Premise Mode:**
 ```env
-REACT_APP_API_URL=http://localhost:5000/api
+DATABASE_HOST=postgres-service.app-backend.svc.cluster.local
+DATABASE_PORT=5432
+DATABASE_SSL_MODE=prefer
+REDIS_HOST=redis-service.app-backend.svc.cluster.local
+REDIS_PORT=6379
+REDIS_SSL=false
 ```
 
-### Docker Compose (`.env`)
-```env
-SECRET_KEY=your-secret-key
-JWT_SECRET_KEY=your-jwt-secret-key
-AI_API_URL=https://api.example.com
-AI_API_KEY=your-api-key
+### GitHub Secrets
+
+Required secrets for CI/CD:
+```
+AZURE_CREDENTIALS
+AZURE_CONTAINER_REGISTRY
+AKS_CLUSTER_NAME
+AKS_RESOURCE_GROUP
+SECRET_KEY
+JWT_SECRET_KEY
+POSTGRES_PASSWORD
+DEPLOYMENT_MODE (azure|onprem)
 ```
 
-## Database
+For Azure mode, also add:
+```
+AZURE_POSTGRES_HOST
+AZURE_POSTGRES_PASSWORD
+AZURE_REDIS_HOST
+AZURE_REDIS_KEY
+```
 
-### PostgreSQL Connection
-- Host: localhost
-- Port: 5432
-- Database: ai_saas
-- User: postgres
-- Password: postgres (change in production)
+## 📊 Monitoring
 
-### Migrations
-
+### Prometheus Metrics
 ```bash
-# Create migration
-cd backend
-flask db migrate -m "Migration message"
-
-# Apply migration
-flask db upgrade
-
-# Rollback migration
-flask db downgrade
+kubectl port-forward -n shared svc/prometheus-service 9090:9090
+# Access: http://localhost:9090
 ```
 
-## Production Deployment
-
-### 1. Update environment variables
-
-Set production values in `.env`:
-- Change all secret keys
-- Set `FLASK_ENV=production`
-- Configure production database URL
-- Set proper AI API credentials
-
-### 2. Build for production
-
-```bash
-docker-compose -f docker-compose.yml build
+### Fluent Bit Logs
+Logs are automatically shipped to Azure Log Analytics. Query in Azure Portal:
+```kusto
+KubernetesLogs
+| where Namespace in ("app-backend", "app-frontend", "shared")
+| order by TimeGenerated desc
 ```
 
-### 3. Run in production mode
+### Application Insights
+View APM data in Azure Portal → Application Insights
 
-```bash
-docker-compose up -d
-```
-
-### 4. Use reverse proxy
-
-For production, use a reverse proxy (nginx/traefik) for:
-- SSL/TLS termination
-- Load balancing
-- Rate limiting
-- Static file caching
-
-## Features in Detail
-
-### File Upload Flow
-1. User uploads file via drag-and-drop or file picker
-2. Frontend validates file type and size
-3. File is uploaded to backend with progress tracking
-4. Backend calculates SHA-256 checksum
-5. Duplicate detection - returns existing file if checksum matches
-6. File saved to `uploaded_files/` directory
-7. Metadata stored in database with checksum as primary key
-8. File automatically sent to AI API for processing
-9. Processing status tracked in real-time
-10. Results displayed to user
-
-### Authentication Flow
-1. User registers or logs in
-2. Backend validates credentials
-3. JWT token issued on successful login
-4. Token stored in localStorage
-5. Token sent with each API request
-6. Backend validates token on protected endpoints
-7. Auto-redirect to login on token expiration
-
-### AI Processing
-- Files automatically processed on upload
-- Duplicate files not re-processed
-- Processing status tracked in database
-- Results stored and can be retrieved later
-- Mock data shown when AI backend unavailable
-
-## Testing
+## 🧪 Testing
 
 ### Backend Tests
 ```bash
 cd backend
-pytest
 pytest --cov=app
 ```
 
@@ -371,80 +314,176 @@ pytest --cov=app
 ```bash
 cd frontend
 npm test
+npm run test:coverage
 ```
 
-## Monitoring
+### Integration Tests
+```bash
+docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+```
 
-### Health Checks
+## 🔐 Security Features
 
-- Frontend: http://localhost:3000/health
-- Backend: http://localhost:5000/api/health/
+- **Authentication:** JWT-based with secure token storage
+- **Authorization:** Role-based access control (RBAC)
+- **Network Security:** Network policies for pod-to-pod communication
+- **Data Encryption:**
+  - In transit: TLS/SSL for all connections
+  - At rest: Encrypted persistent volumes
+- **Secrets Management:** Kubernetes secrets with optional Azure Key Vault
+- **Container Security:** Non-root containers, security contexts, image scanning
+- **API Security:** Rate limiting, CORS, input validation
 
-### Logs
+## 📈 Scaling
 
-Application logs are stored in:
-- Backend: `backend/logs/app.log`
-- Docker: `docker-compose logs`
+### Horizontal Pod Autoscaling
+```bash
+# Backend scales based on CPU/memory
+kubectl get hpa -n app-backend
 
-## Troubleshooting
+# Frontend scales based on CPU
+kubectl get hpa -n app-frontend
+```
+
+### Database Scaling
+
+**Azure Mode:** Scale via Azure Portal or CLI
+```bash
+az postgres flexible-server update \
+  --name <server> --resource-group <rg> \
+  --sku-name GP_Standard_D8s_v3
+```
+
+**On-Premise Mode:** Increase resources in deployment
+```bash
+kubectl scale statefulset/postgres -n app-backend --replicas=3
+```
+
+## 🛠️ Common Operations
+
+### View Logs
+```bash
+# Backend logs
+kubectl logs -f deployment/backend -n app-backend
+
+# Frontend logs
+kubectl logs -f deployment/frontend -n app-frontend
+
+# Monitoring logs
+kubectl logs -f daemonset/fluent-bit -n shared
+```
+
+### Database Backup (On-Premise)
+```bash
+kubectl exec -n app-backend <postgres-pod> -- \
+  pg_dump -U postgres ai_saas_db > backup-$(date +%Y%m%d).sql
+```
+
+### Rollback Deployment
+```bash
+kubectl rollout undo deployment/backend -n app-backend
+kubectl rollout undo deployment/frontend -n app-frontend
+```
+
+### Scale Applications
+```bash
+kubectl scale deployment/backend -n app-backend --replicas=5
+kubectl scale deployment/frontend -n app-frontend --replicas=3
+```
+
+## 💰 Cost Optimization
+
+### Azure Mode
+- Use Burstable PostgreSQL SKU for dev/staging
+- Use Basic Redis tier for non-production
+- Enable AKS cluster auto-shutdown for dev
+- Use spot instances for non-critical workloads
+
+### On-Premise Mode
+- Reduce node count during off-hours
+- Use smaller VM sizes for dev/staging
+- Implement pod resource limits
+- Use node pool auto-scaling
+
+## 🆘 Troubleshooting
+
+### Application Issues
+```bash
+# Check pod status
+kubectl get pods -n app-backend
+
+# Describe pod for details
+kubectl describe pod <pod-name> -n app-backend
+
+# Check events
+kubectl get events -n app-backend --sort-by='.lastTimestamp'
+```
 
 ### Database Connection Issues
 ```bash
-# Check if database is running
-docker-compose ps
+# Test connectivity
+kubectl exec -n app-backend <backend-pod> -- \
+  nc -zv <db-host> 5432
 
-# View database logs
-docker-compose logs db
-
-# Reset database
-docker-compose down -v
-docker-compose up -d db
+# Check logs
+kubectl logs -n app-backend <backend-pod> | grep -i database
 ```
 
-### Frontend Not Loading
+### Ingress Issues
 ```bash
-# Check if frontend container is running
-docker-compose ps frontend
+# Check ingress status
+kubectl get ingress -n app-frontend
+kubectl describe ingress app-ingress -n app-frontend
 
-# View frontend logs
-docker-compose logs frontend
-
-# Rebuild frontend
-docker-compose up --build frontend
+# Check nginx ingress controller
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
 ```
 
-### Backend API Errors
-```bash
-# View backend logs
-docker-compose logs backend
-
-# Check environment variables
-docker-compose exec backend env
-
-# Restart backend
-docker-compose restart backend
-```
-
-### CORS Issues
-Ensure backend `CORS_ORIGINS` includes frontend URL:
-```env
-CORS_ORIGINS=http://localhost:3000
-```
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Write/update tests
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## License
+## 📄 License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details
 
-## Support
+## 👥 Support
 
-For issues and questions:
-- Create an issue on GitHub
-- Check documentation in `frontend/README.md` and `backend/README.md`
+- **Documentation:** See `/docs` folder for detailed guides
+- **Issues:** Report bugs via GitHub Issues
+- **Discussions:** Use GitHub Discussions for questions
+- **Email:** support@example.com
+
+## 🗺️ Roadmap
+
+- [ ] GraphQL API support
+- [ ] Real-time websocket notifications
+- [ ] Multi-tenancy support
+- [ ] Advanced RBAC with fine-grained permissions
+- [ ] Integration with Azure AD for SSO
+- [ ] Kubernetes Operator for automated operations
+- [ ] Grafana dashboards for monitoring
+- [ ] Automated disaster recovery procedures
+- [ ] Multi-region deployment support
+- [ ] Advanced AI model management
+
+## 🙏 Acknowledgments
+
+- Azure Kubernetes Service team for excellent documentation
+- Flask and React communities
+- Terraform providers and community modules
+- Prometheus and Fluent Bit projects
+
+---
+
+**Deployment Status:** Check deployment mode with:
+```bash
+kubectl get configmap backend-config -n app-backend -o yaml | grep DATABASE_HOST
+```
+
+**Version:** 1.0.0
+**Last Updated:** 2025-01-12

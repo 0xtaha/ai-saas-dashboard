@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: app-backend
+  labels:
+    app: backend
+    environment: azure
+data:
+  # Azure managed services
+  DATABASE_HOST: "${AZURE_POSTGRES_HOST}"  # e.g., ai-saas-postgres.postgres.database.azure.com
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "ai_saas_db"
+  DATABASE_USER: "dbadmin"
+  DATABASE_SSL_MODE: "require"
+
+  REDIS_HOST: "${AZURE_REDIS_HOST}"  # e.g., ai-saas-redis.redis.cache.windows.net
+  REDIS_PORT: "6380"
+  REDIS_SSL: "true"
+
+  # Application settings
+  FLASK_ENV: "production"
+  UPLOAD_FOLDER: "/app/uploaded_files"
+  MAX_CONTENT_LENGTH: "16777216"  # 16MB
+
+  # Logging
+  LOG_LEVEL: "INFO"

@@ -1,15 +1,23 @@
 #!/bin/bash
 
-# Manual Deployment Script for Multi-Namespace Architecture
-# Use this for local testing or manual deployments
+# Deployment Script with Azure/On-Premise Mode Support
+# Usage: ./deploy-with-mode.sh [azure|onprem]
 
 set -e
 
 # Configuration
+DEPLOY_MODE="${1:-onprem}"
 ACR_NAME="${ACR_NAME:-aisaasacr}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 
+if [[ "$DEPLOY_MODE" != "azure" && "$DEPLOY_MODE" != "onprem" ]]; then
+    echo "❌ Invalid deployment mode. Use 'azure' or 'onprem'"
+    echo "Usage: ./deploy-with-mode.sh [azure|onprem]"
+    exit 1
+fi
+
 echo "🚀 Starting multi-namespace deployment..."
+echo "Deployment Mode: $DEPLOY_MODE"
 echo "Image Tag: $IMAGE_TAG"
 echo ""
 
@@ -17,6 +25,13 @@ echo ""
 if ! kubectl cluster-info &>/dev/null; then
     echo "❌ kubectl is not configured. Please configure kubectl first."
     exit 1
+fi
+
+# Check if kustomize is installed
+if ! command -v kustomize &> /dev/null; then
+    echo "⚠️  kustomize not found. Installing..."
+    curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    sudo mv kustomize /usr/local/bin/
 fi
 
 # Step 1: Create namespaces
@@ -35,38 +50,74 @@ if ! kubectl get secret monitoring-secrets -n shared &>/dev/null; then
     exit 1
 fi
 
-# Step 3: Deploy Backend Infrastructure
+# Step 3: Deploy based on mode
 echo ""
 echo "═══════════════════════════════════════════"
-echo "  Backend Infrastructure (app-backend)"
+echo "  Deploying in $DEPLOY_MODE mode"
 echo "═══════════════════════════════════════════"
 
-echo "🐘 Deploying PostgreSQL..."
-kubectl apply -f k8s/base/postgres-deployment.yaml
+export AZURE_CONTAINER_REGISTRY="$ACR_NAME.azurecr.io"
+export IMAGE_TAG="$IMAGE_TAG"
 
-echo "📮 Deploying Redis..."
-kubectl apply -f k8s/base/redis-deployment.yaml
+if [[ "$DEPLOY_MODE" == "azure" ]]; then
+    echo "🌩️  Using Azure Managed Services (PostgreSQL, Redis Cache)"
 
-echo "⏳ Waiting for PostgreSQL to be ready..."
-kubectl wait --for=condition=ready pod -l app=postgres -n app-backend --timeout=300s
+    # Check for Azure-specific secrets
+    if ! kubectl get secret azure-services-secrets -n app-backend &>/dev/null; then
+        echo "⚠️  Azure services secrets not found."
+        echo "Please create azure-services-secrets with:"
+        echo "  - AZURE_POSTGRES_HOST"
+        echo "  - AZURE_POSTGRES_PASSWORD"
+        echo "  - AZURE_REDIS_HOST"
+        echo "  - AZURE_REDIS_KEY"
+        exit 1
+    fi
 
-echo "⏳ Waiting for Redis to be ready..."
-kubectl wait --for=condition=ready pod -l app=redis -n app-backend --timeout=120s
+    # Deploy using Azure overlay
+    cd k8s/overlays/azure
+    kustomize edit set image backend=${AZURE_CONTAINER_REGISTRY}/ai-saas-backend:${IMAGE_TAG}
+    kustomize build . | envsubst | kubectl apply -f -
+    cd ../../..
+
+else
+    echo "🏢 Using On-Premise Services (In-cluster PostgreSQL, Redis)"
+
+    # Deploy PostgreSQL
+    echo "🐘 Deploying PostgreSQL..."
+    kubectl apply -f k8s/base/postgres-deployment.yaml
+
+    # Deploy Redis
+    echo "📮 Deploying Redis..."
+    kubectl apply -f k8s/base/redis-deployment.yaml
+
+    # Wait for database to be ready
+    echo "⏳ Waiting for PostgreSQL to be ready..."
+    kubectl wait --for=condition=ready pod -l app=postgres -n app-backend --timeout=300s
+
+    echo "⏳ Waiting for Redis to be ready..."
+    kubectl wait --for=condition=ready pod -l app=redis -n app-backend --timeout=120s
+
+    # Deploy using on-premise overlay
+    cd k8s/overlays/onprem
+    kustomize edit set image backend=${AZURE_CONTAINER_REGISTRY}/ai-saas-backend:${IMAGE_TAG}
+    kustomize build . | envsubst | kubectl apply -f -
+    cd ../../..
+fi
 
 # Step 4: Deploy Backend Application
 echo ""
 echo "🔧 Deploying Backend Application..."
-export AZURE_CONTAINER_REGISTRY="$ACR_NAME.azurecr.io"
-export IMAGE_TAG="$IMAGE_TAG"
 envsubst < k8s/base/backend-deployment.yaml | kubectl apply -f -
 
 echo "⏳ Waiting for backend deployment..."
 kubectl rollout status deployment/backend -n app-backend --timeout=5m
 
 # Step 5: Run database migrations
-echo "🗄️  Running database migrations..."
-BACKEND_POD=$(kubectl get pod -n app-backend -l app=backend -o jsonpath="{.items[0].metadata.name}")
-kubectl exec -n app-backend $BACKEND_POD -- python scripts/init_db.py || echo "⚠️  Migration failed or already initialized"
+if [[ "$DEPLOY_MODE" == "onprem" ]]; then
+    echo "🗄️  Running database migrations..."
+    BACKEND_POD=$(kubectl get pod -n app-backend -l app=backend -o jsonpath="{.items[0].metadata.name}")
+    kubectl exec -n app-backend $BACKEND_POD -- python scripts/init_db.py || echo "⚠️  Migration failed or already initialized"
+fi
 
 # Step 6: Deploy Frontend
 echo ""
@@ -144,36 +195,28 @@ echo "════════════════════════�
 APP_EXTERNAL_IP=$(kubectl get ingress -n app-frontend app-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "Pending...")
 MONITORING_EXTERNAL_IP=$(kubectl get ingress -n shared monitoring-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "Pending...")
 
+echo "Deployment Mode: $DEPLOY_MODE"
 echo "Application External IP: $APP_EXTERNAL_IP"
 echo "Monitoring External IP: $MONITORING_EXTERNAL_IP"
 echo ""
 
-echo "📋 Service FQDNs (for internal access):"
+if [[ "$DEPLOY_MODE" == "azure" ]]; then
+    echo "🌩️  Using Azure Managed Services:"
+    echo "  - Azure Database for PostgreSQL"
+    echo "  - Azure Cache for Redis"
+else
+    echo "🏢 Using In-Cluster Services:"
+    echo "  - PostgreSQL: postgres-service.app-backend.svc.cluster.local:5432"
+    echo "  - Redis: redis-service.app-backend.svc.cluster.local:6379"
+fi
+
+echo ""
+echo "📋 Service FQDNs:"
 echo "  Backend:    http://backend-service.app-backend.svc.cluster.local:5000"
 echo "  Frontend:   http://frontend-service.app-frontend.svc.cluster.local:80"
-echo "  PostgreSQL: postgres-service.app-backend.svc.cluster.local:5432"
-echo "  Redis:      redis-service.app-backend.svc.cluster.local:6379"
 echo "  Prometheus: http://prometheus-service.shared.svc.cluster.local:9090"
 echo ""
 
 echo "📊 Monitoring Endpoints:"
 echo "  Prometheus UI: kubectl port-forward -n shared svc/prometheus-service 9090:9090"
 echo "  Then access:   http://localhost:9090"
-echo ""
-
-echo "📋 Useful Commands:"
-echo "  Logs:"
-echo "    kubectl logs -f deployment/backend -n app-backend"
-echo "    kubectl logs -f deployment/frontend -n app-frontend"
-echo "    kubectl logs -f deployment/prometheus -n shared"
-echo "    kubectl logs -f daemonset/fluent-bit -n shared"
-echo ""
-echo "  Port-forward (for testing):"
-echo "    kubectl port-forward service/backend-service 5000:5000 -n app-backend"
-echo "    kubectl port-forward service/frontend-service 3000:80 -n app-frontend"
-echo "    kubectl port-forward service/prometheus-service 9090:9090 -n shared"
-echo ""
-echo "  Resource usage:"
-echo "    kubectl top pods -n app-backend"
-echo "    kubectl top pods -n app-frontend"
-echo "    kubectl top pods -n shared"

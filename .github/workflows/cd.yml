@@ -16,6 +16,14 @@ on:
           - dev
           - staging
           - prod
+      deployment_mode:
+        description: 'Deployment mode (azure for managed services, onprem for in-cluster)'
+        required: true
+        type: choice
+        options:
+          - azure
+          - onprem
+        default: 'azure'
 
 env:
   AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
@@ -103,7 +111,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set environment
+      - name: Set environment and deployment mode
         id: set-env
         run: |
           if [[ "${{ github.event.inputs.environment }}" != "" ]]; then
@@ -115,6 +123,16 @@ jobs:
           fi
           echo "environment=$ENV" >> $GITHUB_OUTPUT
           echo "DEPLOY_ENV=$ENV" >> $GITHUB_ENV
+
+          # Set deployment mode (default to secret if not provided)
+          if [[ "${{ github.event.inputs.deployment_mode }}" != "" ]]; then
+            MODE="${{ github.event.inputs.deployment_mode }}"
+          else
+            MODE="${{ secrets.DEPLOYMENT_MODE }}"
+          fi
+          MODE="${MODE:-azure}"  # Default to azure if not set
+          echo "deployment_mode=$MODE" >> $GITHUB_OUTPUT
+          echo "DEPLOYMENT_MODE=$MODE" >> $GITHUB_ENV
 
       - name: Azure Login
         uses: azure/login@v1
@@ -133,53 +151,132 @@ jobs:
             --name ${{ env.AKS_CLUSTER_NAME }} \
             --overwrite-existing
 
-      - name: Create namespace if not exists
+      - name: Create namespaces if not exists
         run: |
-          kubectl create namespace ai-saas-dashboard --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/namespaces/namespaces.yaml
 
       - name: Create/Update secrets
         run: |
-          kubectl create secret generic app-secrets \
+          # Backend secrets
+          kubectl create secret generic backend-secrets \
             --from-literal=SECRET_KEY="${{ secrets.SECRET_KEY }}" \
             --from-literal=JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
             --from-literal=POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
             --from-literal=AI_API_KEY="${{ secrets.AI_API_KEY }}" \
             --from-literal=AI_API_URL="${{ secrets.AI_API_URL }}" \
-            --namespace=ai-saas-dashboard \
+            --from-literal=REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+            --namespace=app-backend \
             --dry-run=client -o yaml | kubectl apply -f -
+
+          # Azure services secrets (only for Azure mode)
+          if [[ "${{ env.DEPLOYMENT_MODE }}" == "azure" ]]; then
+            kubectl create secret generic azure-services-secrets \
+              --from-literal=AZURE_POSTGRES_HOST="${{ secrets.AZURE_POSTGRES_HOST }}" \
+              --from-literal=AZURE_POSTGRES_PASSWORD="${{ secrets.AZURE_POSTGRES_PASSWORD }}" \
+              --from-literal=AZURE_REDIS_HOST="${{ secrets.AZURE_REDIS_HOST }}" \
+              --from-literal=AZURE_REDIS_KEY="${{ secrets.AZURE_REDIS_KEY }}" \
+              --namespace=app-backend \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
+
+          # Monitoring secrets
+          kubectl create secret generic monitoring-secrets \
+            --from-literal=WORKSPACE_ID="${{ secrets.AZURE_LOG_ANALYTICS_WORKSPACE_ID }}" \
+            --from-literal=WORKSPACE_KEY="${{ secrets.AZURE_LOG_ANALYTICS_WORKSPACE_KEY }}" \
+            --namespace=shared \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          # Monitoring basic auth
+          echo "${{ secrets.MONITORING_PASSWORD }}" | htpasswd -ci auth admin
+          kubectl create secret generic monitoring-basic-auth \
+            --from-file=auth \
+            --namespace=shared \
+            --dry-run=client -o yaml | kubectl apply -f -
+          rm -f auth
 
       - name: Deploy to AKS
         run: |
           export IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
           export AZURE_CONTAINER_REGISTRY="${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io"
 
-          # Apply base configurations
-          envsubst < k8s/base/configmap.yaml | kubectl apply -f -
-          envsubst < k8s/base/postgres-deployment.yaml | kubectl apply -f -
-          envsubst < k8s/base/redis-deployment.yaml | kubectl apply -f -
+          echo "Deploying in ${{ env.DEPLOYMENT_MODE }} mode..."
+
+          if [[ "${{ env.DEPLOYMENT_MODE }}" == "onprem" ]]; then
+            echo "📦 Deploying on-premise infrastructure..."
+
+            # Deploy PostgreSQL and Redis in-cluster
+            envsubst < k8s/base/postgres-deployment.yaml | kubectl apply -f -
+            envsubst < k8s/base/redis-deployment.yaml | kubectl apply -f -
+
+            # Wait for database
+            echo "⏳ Waiting for PostgreSQL..."
+            kubectl wait --for=condition=ready pod -l app=postgres -n app-backend --timeout=300s
+
+            echo "⏳ Waiting for Redis..."
+            kubectl wait --for=condition=ready pod -l app=redis -n app-backend --timeout=120s
+
+            # Apply on-premise config
+            kubectl apply -f k8s/overlays/onprem/backend-config.yaml
+          else
+            echo "🌩️  Using Azure managed services..."
+
+            # Apply Azure config
+            kubectl apply -f k8s/overlays/azure/backend-config.yaml
+          fi
+
+          # Deploy backend application
+          echo "🔧 Deploying backend application..."
           envsubst < k8s/base/backend-deployment.yaml | kubectl apply -f -
+
+          # Deploy frontend (app-frontend namespace)
+          echo "🎨 Deploying frontend..."
           envsubst < k8s/base/frontend-deployment.yaml | kubectl apply -f -
+
+          # Deploy monitoring stack (shared namespace)
+          echo "📊 Deploying monitoring stack..."
+          kubectl apply -f k8s/monitoring/fluent-bit/
+          kubectl apply -f k8s/monitoring/prometheus/
 
           # Apply ingress if production
           if [[ "${{ env.DEPLOY_ENV }}" == "prod" ]]; then
-            envsubst < k8s/base/ingress.yaml | kubectl apply -f -
+            echo "🌐 Deploying ingress..."
+            kubectl apply -f k8s/base/ingress.yaml
           fi
 
       - name: Wait for deployment
         run: |
-          kubectl rollout status deployment/backend -n ai-saas-dashboard --timeout=5m
-          kubectl rollout status deployment/frontend -n ai-saas-dashboard --timeout=5m
+          kubectl rollout status deployment/backend -n app-backend --timeout=5m
+          kubectl rollout status deployment/frontend -n app-frontend --timeout=5m
+          kubectl rollout status deployment/prometheus -n shared --timeout=5m
 
       - name: Run database migrations
         run: |
-          POD=$(kubectl get pod -n ai-saas-dashboard -l app=backend -o jsonpath="{.items[0].metadata.name}")
-          kubectl exec -n ai-saas-dashboard $POD -- python scripts/init_db.py || true
+          # Only run migrations for on-premise mode (Azure PostgreSQL should be pre-configured)
+          if [[ "${{ env.DEPLOYMENT_MODE }}" == "onprem" ]]; then
+            echo "🗄️  Running database migrations..."
+            POD=$(kubectl get pod -n app-backend -l app=backend -o jsonpath="{.items[0].metadata.name}")
+            kubectl exec -n app-backend $POD -- python scripts/init_db.py || true
+          else
+            echo "ℹ️  Skipping migrations (Azure PostgreSQL should be pre-configured)"
+          fi
 
       - name: Verify deployment
         run: |
-          kubectl get pods -n ai-saas-dashboard
-          kubectl get services -n ai-saas-dashboard
-          kubectl get ingress -n ai-saas-dashboard
+          echo "=== app-backend namespace ==="
+          kubectl get pods -n app-backend
+          kubectl get services -n app-backend
+          echo ""
+          echo "=== app-frontend namespace ==="
+          kubectl get pods -n app-frontend
+          kubectl get services -n app-frontend
+          echo ""
+          echo "=== shared namespace (monitoring) ==="
+          kubectl get pods -n shared
+          kubectl get services -n shared
+          echo ""
+          echo "=== Ingress ==="
+          kubectl get ingress -n app-frontend
+          kubectl get ingress -n shared
 
       - name: Send deployment notification
         if: always()
@@ -188,6 +285,7 @@ jobs:
           status: ${{ job.status }}
           text: |
             Deployment to ${{ env.DEPLOY_ENV }} ${{ job.status }}
+            Deployment Mode: ${{ env.DEPLOYMENT_MODE }}
             Image Tag: ${{ needs.build-and-push.outputs.image_tag }}
           webhook_url: ${{ secrets.SLACK_WEBHOOK }}
         env:
@@ -214,13 +312,13 @@ jobs:
 
       - name: Rollback Backend
         run: |
-          kubectl rollout undo deployment/backend -n ai-saas-dashboard
+          kubectl rollout undo deployment/backend -n app-backend
 
       - name: Rollback Frontend
         run: |
-          kubectl rollout undo deployment/frontend -n ai-saas-dashboard
+          kubectl rollout undo deployment/frontend -n app-frontend
 
       - name: Verify rollback
         run: |
-          kubectl rollout status deployment/backend -n ai-saas-dashboard
-          kubectl rollout status deployment/frontend -n ai-saas-dashboard
+          kubectl rollout status deployment/backend -n app-backend
+          kubectl rollout status deployment/frontend -n app-frontend

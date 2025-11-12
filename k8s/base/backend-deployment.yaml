@@ -18,12 +18,17 @@ metadata:
   namespace: app-backend
 data:
   FLASK_ENV: "production"
-  POSTGRES_DB: "ai_saas"
-  POSTGRES_USER: "postgres"
+  DATABASE_NAME: "ai_saas_db"
+  DATABASE_USER: "postgres"
   DATABASE_HOST: "postgres-service.app-backend.svc.cluster.local"
   DATABASE_PORT: "5432"
+  DATABASE_SSL_MODE: "prefer"
   REDIS_HOST: "redis-service.app-backend.svc.cluster.local"
   REDIS_PORT: "6379"
+  REDIS_SSL: "false"
+  UPLOAD_FOLDER: "/app/uploaded_files"
+  MAX_CONTENT_LENGTH: "16777216"
+  LOG_LEVEL: "INFO"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -71,18 +76,6 @@ spec:
             secretKeyRef:
               name: backend-secrets
               key: JWT_SECRET_KEY
-        - name: DATABASE_URL
-          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(POSTGRES_DB)"
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: POSTGRES_USER
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: backend-secrets
-              key: POSTGRES_PASSWORD
         - name: DATABASE_HOST
           valueFrom:
             configMapKeyRef:
@@ -93,11 +86,49 @@ spec:
             configMapKeyRef:
               name: backend-config
               key: DATABASE_PORT
-        - name: POSTGRES_DB
+        - name: DATABASE_NAME
           valueFrom:
             configMapKeyRef:
               name: backend-config
-              key: POSTGRES_DB
+              key: DATABASE_NAME
+        - name: DATABASE_USER
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: POSTGRES_PASSWORD
+        - name: DATABASE_SSL_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: DATABASE_SSL_MODE
+        - name: DATABASE_URL
+          value: "postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)?sslmode=$(DATABASE_SSL_MODE)"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: REDIS_PORT
+        - name: REDIS_SSL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: REDIS_SSL
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: REDIS_PASSWORD
+              optional: true
         - name: AI_API_URL
           valueFrom:
             secretKeyRef:
