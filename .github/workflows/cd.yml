@@ -153,7 +153,7 @@ jobs:
 
       - name: Create namespaces if not exists
         run: |
-          kubectl apply -f k8s/namespaces/namespaces.yaml
+          kubectl apply -f infra/k8s/namespaces/namespaces.yaml
 
       - name: Create/Update secrets
         run: |
@@ -175,6 +175,7 @@ jobs:
               --from-literal=AZURE_POSTGRES_PASSWORD="${{ secrets.AZURE_POSTGRES_PASSWORD }}" \
               --from-literal=AZURE_REDIS_HOST="${{ secrets.AZURE_REDIS_HOST }}" \
               --from-literal=AZURE_REDIS_KEY="${{ secrets.AZURE_REDIS_KEY }}" \
+              --from-literal=AZURE_STORAGE_CONNECTION_STRING="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
               --namespace=app-backend \
               --dry-run=client -o yaml | kubectl apply -f -
           fi
@@ -205,8 +206,8 @@ jobs:
             echo "📦 Deploying on-premise infrastructure..."
 
             # Deploy PostgreSQL and Redis in-cluster
-            envsubst < k8s/base/postgres-deployment.yaml | kubectl apply -f -
-            envsubst < k8s/base/redis-deployment.yaml | kubectl apply -f -
+            envsubst < infra/k8s/base/postgres-deployment.yaml | kubectl apply -f -
+            envsubst < infra/k8s/base/redis-deployment.yaml | kubectl apply -f -
 
             # Wait for database
             echo "⏳ Waiting for PostgreSQL..."
@@ -216,31 +217,31 @@ jobs:
             kubectl wait --for=condition=ready pod -l app=redis -n app-backend --timeout=120s
 
             # Apply on-premise config
-            kubectl apply -f k8s/overlays/onprem/backend-config.yaml
+            kubectl apply -f infra/k8s/overlays/onprem/backend-config.yaml
           else
             echo "🌩️  Using Azure managed services..."
 
             # Apply Azure config
-            kubectl apply -f k8s/overlays/azure/backend-config.yaml
+            kubectl apply -f infra/k8s/overlays/azure/backend-config.yaml
           fi
 
           # Deploy backend application
           echo "🔧 Deploying backend application..."
-          envsubst < k8s/base/backend-deployment.yaml | kubectl apply -f -
+          envsubst < infra/k8s/base/backend-deployment.yaml | kubectl apply -f -
 
           # Deploy frontend (app-frontend namespace)
           echo "🎨 Deploying frontend..."
-          envsubst < k8s/base/frontend-deployment.yaml | kubectl apply -f -
+          envsubst < infra/k8s/base/frontend-deployment.yaml | kubectl apply -f -
 
           # Deploy monitoring stack (shared namespace)
           echo "📊 Deploying monitoring stack..."
-          kubectl apply -f k8s/monitoring/fluent-bit/
-          kubectl apply -f k8s/monitoring/prometheus/
+          kubectl apply -f infra/k8s/monitoring/fluent-bit/
+          kubectl apply -f infra/k8s/monitoring/prometheus/
 
           # Apply ingress if production
           if [[ "${{ env.DEPLOY_ENV }}" == "prod" ]]; then
             echo "🌐 Deploying ingress..."
-            kubectl apply -f k8s/base/ingress.yaml
+            kubectl apply -f infra/k8s/base/ingress.yaml
           fi
 
       - name: Wait for deployment

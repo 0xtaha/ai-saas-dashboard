@@ -1,11 +1,14 @@
 #!/bin/bash
 
 # Script to create Kubernetes secrets for multi-namespace architecture
-# Usage: ./create-secrets.sh
+# Usage: ./create-secrets.sh [azure|onprem]
 
 set -e
 
+DEPLOYMENT_MODE="${1:-onprem}"
+
 echo "🔐 Creating Kubernetes Secrets for multi-namespace deployment..."
+echo "📦 Deployment mode: $DEPLOYMENT_MODE"
 
 # Check if namespaces exist
 kubectl get namespace app-backend &>/dev/null || kubectl create namespace app-backend
@@ -34,6 +37,36 @@ kubectl create secret generic backend-secrets \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "✅ Backend secrets created successfully!"
+
+# Create Azure-specific secrets if in Azure mode
+if [ "$DEPLOYMENT_MODE" == "azure" ]; then
+  echo ""
+  echo "📝 Azure Services Secrets (app-backend namespace):"
+  echo "ℹ️  These can be obtained from Terraform outputs:"
+  echo "    terraform output -json | jq -r '.postgres_host.value'"
+  echo ""
+
+  read -p "Enter AZURE_POSTGRES_HOST: " AZURE_POSTGRES_HOST
+  read -sp "Enter AZURE_POSTGRES_PASSWORD: " AZURE_POSTGRES_PASSWORD
+  echo ""
+  read -p "Enter AZURE_REDIS_HOST: " AZURE_REDIS_HOST
+  read -sp "Enter AZURE_REDIS_KEY: " AZURE_REDIS_KEY
+  echo ""
+  read -sp "Enter AZURE_STORAGE_CONNECTION_STRING: " AZURE_STORAGE_CONNECTION_STRING
+  echo ""
+
+  # Create Azure services secret
+  kubectl create secret generic azure-services-secrets \
+    --from-literal=AZURE_POSTGRES_HOST="$AZURE_POSTGRES_HOST" \
+    --from-literal=AZURE_POSTGRES_PASSWORD="$AZURE_POSTGRES_PASSWORD" \
+    --from-literal=AZURE_REDIS_HOST="$AZURE_REDIS_HOST" \
+    --from-literal=AZURE_REDIS_KEY="$AZURE_REDIS_KEY" \
+    --from-literal=AZURE_STORAGE_CONNECTION_STRING="$AZURE_STORAGE_CONNECTION_STRING" \
+    --namespace=app-backend \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+  echo "✅ Azure services secrets created successfully!"
+fi
 
 echo ""
 echo "📝 Monitoring Secrets (shared namespace):"
@@ -70,10 +103,16 @@ echo "✅ Monitoring secrets created successfully!"
 echo ""
 echo "📋 Summary:"
 echo "  - backend-secrets created in app-backend namespace"
+if [ "$DEPLOYMENT_MODE" == "azure" ]; then
+  echo "  - azure-services-secrets created in app-backend namespace"
+fi
 echo "  - monitoring-secrets created in shared namespace"
 echo "  - monitoring-basic-auth created in shared namespace"
 echo ""
 echo "To view secrets (base64 encoded):"
 echo "  kubectl get secret backend-secrets -n app-backend -o yaml"
+if [ "$DEPLOYMENT_MODE" == "azure" ]; then
+  echo "  kubectl get secret azure-services-secrets -n app-backend -o yaml"
+fi
 echo "  kubectl get secret monitoring-secrets -n shared -o yaml"
 echo "  kubectl get secret monitoring-basic-auth -n shared -o yaml"

@@ -26,6 +26,7 @@ data:
   REDIS_HOST: "redis-service.app-backend.svc.cluster.local"
   REDIS_PORT: "6379"
   REDIS_SSL: "false"
+  STORAGE_TYPE: "local"
   UPLOAD_FOLDER: "/app/uploaded_files"
   MAX_CONTENT_LENGTH: "16777216"
   LOG_LEVEL: "INFO"

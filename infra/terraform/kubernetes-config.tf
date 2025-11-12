@@ -47,10 +47,11 @@ resource "kubernetes_secret" "azure_services" {
   }
 
   data = {
-    AZURE_POSTGRES_HOST     = azurerm_postgresql_flexible_server.main[0].fqdn
-    AZURE_POSTGRES_PASSWORD = random_password.postgres[0].result
-    AZURE_REDIS_HOST        = azurerm_redis_cache.main[0].hostname
-    AZURE_REDIS_KEY         = azurerm_redis_cache.main[0].primary_access_key
+    AZURE_POSTGRES_HOST             = azurerm_postgresql_flexible_server.main[0].fqdn
+    AZURE_POSTGRES_PASSWORD         = random_password.postgres[0].result
+    AZURE_REDIS_HOST                = azurerm_redis_cache.main[0].hostname
+    AZURE_REDIS_KEY                 = azurerm_redis_cache.main[0].primary_access_key
+    AZURE_STORAGE_CONNECTION_STRING = azurerm_storage_account.main[0].primary_connection_string
   }
 
   type = "Opaque"
@@ -85,18 +86,19 @@ resource "kubernetes_config_map" "backend_azure" {
   }
 
   data = {
-    FLASK_ENV         = "production"
-    DATABASE_HOST     = azurerm_postgresql_flexible_server.main[0].fqdn
-    DATABASE_PORT     = "5432"
-    DATABASE_NAME     = "ai_saas_db"
-    DATABASE_USER     = var.postgres_admin_username
-    DATABASE_SSL_MODE = "require"
-    REDIS_HOST        = azurerm_redis_cache.main[0].hostname
-    REDIS_PORT        = "6380"
-    REDIS_SSL         = "true"
-    UPLOAD_FOLDER     = "/app/uploaded_files"
-    MAX_CONTENT_LENGTH = "16777216"
-    LOG_LEVEL         = "INFO"
+    FLASK_ENV                = "production"
+    DATABASE_HOST            = azurerm_postgresql_flexible_server.main[0].fqdn
+    DATABASE_PORT            = "5432"
+    DATABASE_NAME            = "ai_saas_db"
+    DATABASE_USER            = var.postgres_admin_username
+    DATABASE_SSL_MODE        = "require"
+    REDIS_HOST               = azurerm_redis_cache.main[0].hostname
+    REDIS_PORT               = "6380"
+    REDIS_SSL                = "true"
+    STORAGE_TYPE             = "azure"
+    AZURE_STORAGE_CONTAINER  = "uploaded-files"
+    MAX_CONTENT_LENGTH       = "16777216"
+    LOG_LEVEL                = "INFO"
   }
 }
 

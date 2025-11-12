@@ -18,9 +18,12 @@ data:
   REDIS_PORT: "6380"
   REDIS_SSL: "true"
 
+  # Azure Blob Storage
+  STORAGE_TYPE: "azure"
+  AZURE_STORAGE_CONTAINER: "uploaded-files"
+
   # Application settings
   FLASK_ENV: "production"
-  UPLOAD_FOLDER: "/app/uploaded_files"
   MAX_CONTENT_LENGTH: "16777216"  # 16MB
 
   # Logging

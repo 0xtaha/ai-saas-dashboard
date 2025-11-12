@@ -157,3 +157,31 @@ output "next_steps" {
     4. PostgreSQL and Redis will be deployed in-cluster
   EOT
 }
+
+# Storage outputs (Azure mode only)
+output "storage_account_name" {
+  description = "Name of the storage account"
+  value       = var.deployment_mode == "azure" ? azurerm_storage_account.main[0].name : null
+}
+
+output "storage_account_primary_access_key" {
+  description = "Primary access key for storage account"
+  value       = var.deployment_mode == "azure" ? azurerm_storage_account.main[0].primary_access_key : null
+  sensitive   = true
+}
+
+output "storage_account_connection_string" {
+  description = "Connection string for storage account"
+  value       = var.deployment_mode == "azure" ? azurerm_storage_account.main[0].primary_connection_string : null
+  sensitive   = true
+}
+
+output "storage_blob_endpoint" {
+  description = "Blob endpoint for storage account"
+  value       = var.deployment_mode == "azure" ? azurerm_storage_account.main[0].primary_blob_endpoint : null
+}
+
+output "uploaded_files_container_name" {
+  description = "Name of the uploaded files container"
+  value       = var.deployment_mode == "azure" ? azurerm_storage_container.uploaded_files[0].name : null
+}

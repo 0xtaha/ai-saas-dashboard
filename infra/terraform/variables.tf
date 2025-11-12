@@ -150,3 +150,38 @@ variable "tags" {
     Environment = "Production"
   }
 }
+
+# Storage Variables (only used when deployment_mode = "azure")
+variable "storage_replication_type" {
+  description = "Storage replication type"
+  type        = string
+  default     = "GRS"
+  validation {
+    condition     = contains(["LRS", "GRS", "RAGRS", "ZRS"], var.storage_replication_type)
+    error_message = "Storage replication type must be one of: LRS, GRS, RAGRS, ZRS."
+  }
+}
+
+variable "enable_private_endpoints" {
+  description = "Enable private endpoints for storage and other Azure services"
+  type        = bool
+  default     = false
+}
+
+variable "blob_lifecycle_days_to_cool" {
+  description = "Days after which blobs are moved to cool tier"
+  type        = number
+  default     = 30
+}
+
+variable "blob_lifecycle_days_to_archive" {
+  description = "Days after which blobs are moved to archive tier"
+  type        = number
+  default     = 90
+}
+
+variable "blob_lifecycle_days_to_delete" {
+  description = "Days after which blobs are deleted"
+  type        = number
+  default     = 365
+}

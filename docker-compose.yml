@@ -29,8 +29,10 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-jwt-secret-key}
       - AI_API_URL=${AI_API_URL}
       - AI_API_KEY=${AI_API_KEY}
+      - STORAGE_TYPE=local
+      - UPLOAD_FOLDER=/app/uploaded_files
     volumes:
-      - ./backend/uploaded_files:/app/uploaded_files
+      - uploaded_files:/app/uploaded_files
       - ./backend/logs:/app/logs
     depends_on:
       - db
@@ -62,6 +64,7 @@ services:
 
 volumes:
   postgres_data:
+  uploaded_files:
 
 networks:
   app-network:

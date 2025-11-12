@@ -18,7 +18,7 @@ class AuthService:
         
         user = User(username=username, email=email)
         user.set_password(password)
-        
+        # todo : add support for using 
         db.session.add(user)
         db.session.commit()
         

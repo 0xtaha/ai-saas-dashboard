@@ -31,3 +31,10 @@ spec:
               key: AZURE_REDIS_KEY
         - name: REDIS_SSL
           value: "true"
+        - name: AZURE_STORAGE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: azure-services-secrets
+              key: AZURE_STORAGE_CONNECTION_STRING
+        - name: STORAGE_TYPE
+          value: "azure"

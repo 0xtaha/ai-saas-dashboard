@@ -106,38 +106,38 @@ http://frontend-service.app-frontend.svc.cluster.local:80/metrics
 
 1. **Namespaces**
    ```bash
-   kubectl apply -f k8s/namespaces/namespaces.yaml
+   kubectl apply -f infra/k8s/namespaces/namespaces.yaml
    ```
 
 2. **Secrets & ConfigMaps**
    ```bash
-   kubectl apply -f k8s/base/backend-secrets.yaml
-   kubectl apply -f k8s/base/backend-deployment.yaml  # Contains ConfigMap
-   kubectl apply -f k8s/base/frontend-deployment.yaml # Contains ConfigMap
+   kubectl apply -f infra/k8s/base/backend-secrets.yaml
+   kubectl apply -f infra/k8s/base/backend-deployment.yaml  # Contains ConfigMap
+   kubectl apply -f infra/k8s/base/frontend-deployment.yaml # Contains ConfigMap
    ```
 
 3. **Backend Infrastructure**
    ```bash
-   kubectl apply -f k8s/base/postgres-deployment.yaml
-   kubectl apply -f k8s/base/redis-deployment.yaml
+   kubectl apply -f infra/k8s/base/postgres-deployment.yaml
+   kubectl apply -f infra/k8s/base/redis-deployment.yaml
    kubectl wait --for=condition=ready pod -l app=postgres -n app-backend --timeout=300s
    ```
 
 4. **Applications**
    ```bash
-   kubectl apply -f k8s/base/backend-deployment.yaml
-   kubectl apply -f k8s/base/frontend-deployment.yaml
+   kubectl apply -f infra/k8s/base/backend-deployment.yaml
+   kubectl apply -f infra/k8s/base/frontend-deployment.yaml
    ```
 
 5. **Monitoring Stack**
    ```bash
-   kubectl apply -f k8s/monitoring/fluent-bit/
-   kubectl apply -f k8s/monitoring/prometheus/
+   kubectl apply -f infra/k8s/monitoring/fluent-bit/
+   kubectl apply -f infra/k8s/monitoring/prometheus/
    ```
 
 6. **Ingress**
    ```bash
-   kubectl apply -f k8s/base/ingress.yaml
+   kubectl apply -f infra/k8s/base/ingress.yaml
    ```
 
 ## Monitoring Architecture
@@ -261,7 +261,7 @@ kubectl get configmap app-config -n ai-saas-dashboard -o yaml > old-config.yaml
 kubectl get secret app-secrets -n ai-saas-dashboard -o yaml > old-secrets.yaml
 
 # 2. Create new namespaces
-kubectl apply -f k8s/namespaces/namespaces.yaml
+kubectl apply -f infra/k8s/namespaces/namespaces.yaml
 
 # 3. Migrate secrets to new namespaces
 kubectl create secret generic backend-secrets \
@@ -269,10 +269,10 @@ kubectl create secret generic backend-secrets \
   -n app-backend
 
 # 4. Deploy to new namespaces
-kubectl apply -f k8s/base/
+kubectl apply -f infra/k8s/base/
 
 # 5. Update ingress to point to new services
-kubectl apply -f k8s/base/ingress.yaml
+kubectl apply -f infra/k8s/base/ingress.yaml
 
 # 6. Delete old namespace (after verification)
 kubectl delete namespace ai-saas-dashboard

@@ -15,14 +15,15 @@ The application supports two deployment architectures:
 |---------|-----------|-----------------|
 | **Database** | Azure Database for PostgreSQL Flexible Server | PostgreSQL pod in AKS |
 | **Cache** | Azure Cache for Redis (Premium) | Redis pod in AKS |
+| **File Storage** | Azure Blob Storage | Persistent Volume Claims (PVC) |
 | **High Availability** | Zone-redundant, auto-failover | Requires manual configuration |
 | **Backup & Recovery** | Automated (7-day retention, geo-redundant) | Manual setup required |
-| **Scaling** | Independent scaling of DB/Cache | Limited by pod resources |
+| **Scaling** | Independent scaling of DB/Cache/Storage | Limited by pod resources |
 | **Maintenance** | Managed by Microsoft | Self-managed |
 | **Performance** | Dedicated resources, optimized | Good, but shared node resources |
 | **Security** | Private endpoints, VNet integration | Network policies |
 | **Monitoring** | Built-in Azure Monitor integration | Prometheus + custom exporters |
-| **Cost (est.)** | ~$1,140/month | ~$490/month |
+| **Cost (est.)** | ~$1,140/month + storage costs | ~$490/month |
 | **Best For** | Production workloads | Development, testing, cost-sensitive |
 
 ## Architecture Diagrams
@@ -46,16 +47,16 @@ The application supports two deployment architectures:
 │  │         │                                           │   │
 │  └─────────┼───────────────────────────────────────────┘   │
 │            │                                                │
-│            ├──────────────────┬──────────────────┐         │
-│            │                  │                  │         │
-│  ┌─────────▼─────────┐ ┌─────▼────────┐ ┌──────▼───────┐ │
-│  │ Azure PostgreSQL  │ │ Azure Redis  │ │     ACR      │ │
-│  │ Flexible Server   │ │    Cache     │ │  (Images)    │ │
-│  │                   │ │              │ │              │ │
-│  │ • Zone Redundant  │ │ • Premium    │ │              │ │
-│  │ • Auto Backup     │ │ • Clustered  │ │              │ │
-│  │ • Private Endpoint│ │ • Private EP │ │              │ │
-│  └───────────────────┘ └──────────────┘ └──────────────┘ │
+│            ├─────────────┬──────────────┬─────────────┐    │
+│            │             │              │             │    │
+│  ┌─────────▼─────────┐ ┌▼────────────┐ ┌▼──────────┐ │    │
+│  │ Azure PostgreSQL  │ │Azure Redis  │ │Azure Blob │ │ACR │
+│  │ Flexible Server   │ │   Cache     │ │  Storage  │ │    │
+│  │                   │ │             │ │           │ │    │
+│  │ • Zone Redundant  │ │ • Premium   │ │• Lifecycle│ │    │
+│  │ • Auto Backup     │ │ • Clustered │ │• Versioning││   │
+│  │ • Private Endpoint│ │ • Private EP│ │• Geo-Redun│ │    │
+│  └───────────────────┘ └─────────────┘ └───────────┘ └────┘│
 │                                                             │
 │  ┌────────────────────────────────────────────────────┐   │
 │  │           Log Analytics Workspace                  │   │
@@ -82,11 +83,16 @@ The application supports two deployment architectures:
 │  │  │ ┌──────────┐ │  │              │  │           │ │   │
 │  │  │ │PostgreSQL│ │  │              │  │           │ │   │
 │  │  │ │   Pod    │ │  │              │  │           │ │   │
+│  │  │ │  + PVC   │ │  │              │  │           │ │   │
 │  │  │ │          │ │  │              │  │           │ │   │
 │  │  │ │ ┌──────┐ │ │  │              │  │           │ │   │
 │  │  │ │ │Redis │ │ │  │              │  │           │ │   │
 │  │  │ │ │ Pod  │ │ │  │              │  │           │ │   │
-│  │  │ └─┴──────┴─┘ │  │              │  │           │ │   │
+│  │  │ │ │      │ │ │  │              │  │           │ │   │
+│  │  │ │ │┌─────┴┐│ │  │              │  │           │ │   │
+│  │  │ └─┴┴Files ├┘ │  │              │  │           │ │   │
+│  │  │    │ PVC  │  │  │              │  │           │ │   │
+│  │  │    └──────┘  │  │              │  │           │ │   │
 │  │  └──────────────┘  └──────────────┘  └───────────┘ │   │
 │  │                                                       │   │
 │  └───────────────────────────────────────────────────────┘ │
@@ -231,6 +237,7 @@ AZURE_POSTGRES_HOST
 AZURE_POSTGRES_PASSWORD
 AZURE_REDIS_HOST
 AZURE_REDIS_KEY
+AZURE_STORAGE_CONNECTION_STRING
 ```
 
 ### Manual Deployment Workflow
@@ -250,14 +257,14 @@ Push to `main` branch triggers automatic deployment with the mode specified in `
 ## Configuration Files
 
 ### Azure Mode
-- [k8s/overlays/azure/backend-config.yaml](k8s/overlays/azure/backend-config.yaml) - Azure-specific configuration
-- [k8s/overlays/azure/backend-patch.yaml](k8s/overlays/azure/backend-patch.yaml) - Environment variable overrides
-- [k8s/overlays/azure/azure-secrets.yaml](k8s/overlays/azure/azure-secrets.yaml) - Azure services credentials template
+- [k8s/overlays/azure/backend-config.yaml](infra/k8s/overlays/azure/backend-config.yaml) - Azure-specific configuration
+- [k8s/overlays/azure/backend-patch.yaml](infra/k8s/overlays/azure/backend-patch.yaml) - Environment variable overrides
+- [k8s/overlays/azure/azure-secrets.yaml](infra/k8s/overlays/azure/azure-secrets.yaml) - Azure services credentials template
 
 ### On-Premise Mode
-- [k8s/overlays/onprem/backend-config.yaml](k8s/overlays/onprem/backend-config.yaml) - On-premise configuration
-- [k8s/base/postgres-deployment.yaml](k8s/base/postgres-deployment.yaml) - PostgreSQL StatefulSet
-- [k8s/base/redis-deployment.yaml](k8s/base/redis-deployment.yaml) - Redis Deployment
+- [k8s/overlays/onprem/backend-config.yaml](infra/k8s/overlays/onprem/backend-config.yaml) - On-premise configuration
+- [k8s/base/postgres-deployment.yaml](infra/k8s/base/postgres-deployment.yaml) - PostgreSQL StatefulSet
+- [k8s/base/redis-deployment.yaml](infra/k8s/base/redis-deployment.yaml) - Redis Deployment
 
 ## Environment Variables
 
@@ -275,6 +282,10 @@ REDIS_HOST=<redis-cache>.redis.cache.windows.net
 REDIS_PORT=6380
 REDIS_SSL=true
 REDIS_PASSWORD=<from-azure-secret>
+
+STORAGE_TYPE=azure
+AZURE_STORAGE_CONNECTION_STRING=<from-azure-secret>
+AZURE_STORAGE_CONTAINER=uploaded-files
 ```
 
 #### On-Premise Mode
@@ -289,6 +300,78 @@ REDIS_HOST=redis-service.app-backend.svc.cluster.local
 REDIS_PORT=6379
 REDIS_SSL=false
 REDIS_PASSWORD=<optional>
+
+STORAGE_TYPE=local
+UPLOAD_FOLDER=/app/uploaded_files
+```
+
+### Storage Configuration
+
+#### Azure Blob Storage (Azure Mode)
+
+The backend automatically uses Azure Blob Storage when `STORAGE_TYPE=azure`:
+
+**Features:**
+- Geo-redundant storage (GRS)
+- Blob versioning enabled
+- Soft delete (7-day retention)
+- Lifecycle management:
+  - Hot tier: New uploads
+  - Cool tier: After 30 days
+  - Archive tier: After 90 days
+  - Delete: After 365 days
+- Optional private endpoints for secure access
+
+**Terraform Configuration:**
+```hcl
+# infra/terraform/storage.tf
+resource "azurerm_storage_account" "main" {
+  account_replication_type = "GRS"
+
+  blob_properties {
+    versioning_enabled = true
+    delete_retention_policy {
+      days = 7
+    }
+  }
+}
+```
+
+**Getting Connection String:**
+```bash
+# From Terraform outputs
+terraform output -raw storage_account_connection_string
+
+# Or from Azure CLI
+az storage account show-connection-string \
+  --resource-group <rg-name> \
+  --name <storage-account-name>
+```
+
+#### Local Storage with PVC (On-Premise Mode)
+
+The backend uses persistent volumes when `STORAGE_TYPE=local`:
+
+**Features:**
+- 50Gi persistent volume claim
+- Azure File storage class (azurefile)
+- Mounted at `/app/uploaded_files`
+- Persists across pod restarts
+
+**K8s Configuration:**
+```yaml
+# infra/k8s/base/backend-deployment.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploaded-files-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: azurefile
+  resources:
+    requests:
+      storage: 50Gi
 ```
 
 ## Monitoring and Observability

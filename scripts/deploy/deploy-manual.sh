@@ -21,7 +21,7 @@ fi
 
 # Step 1: Create namespaces
 echo "📦 Creating namespaces..."
-kubectl apply -f k8s/namespaces/namespaces.yaml
+kubectl apply -f infra/k8s/namespaces/namespaces.yaml
 
 # Step 2: Check secrets
 echo "🔐 Checking secrets..."
@@ -42,10 +42,10 @@ echo "  Backend Infrastructure (app-backend)"
 echo "═══════════════════════════════════════════"
 
 echo "🐘 Deploying PostgreSQL..."
-kubectl apply -f k8s/base/postgres-deployment.yaml
+kubectl apply -f infra/k8s/base/postgres-deployment.yaml
 
 echo "📮 Deploying Redis..."
-kubectl apply -f k8s/base/redis-deployment.yaml
+kubectl apply -f infra/k8s/base/redis-deployment.yaml
 
 echo "⏳ Waiting for PostgreSQL to be ready..."
 kubectl wait --for=condition=ready pod -l app=postgres -n app-backend --timeout=300s
@@ -58,7 +58,7 @@ echo ""
 echo "🔧 Deploying Backend Application..."
 export AZURE_CONTAINER_REGISTRY="$ACR_NAME.azurecr.io"
 export IMAGE_TAG="$IMAGE_TAG"
-envsubst < k8s/base/backend-deployment.yaml | kubectl apply -f -
+envsubst < infra/k8s/base/backend-deployment.yaml | kubectl apply -f -
 
 echo "⏳ Waiting for backend deployment..."
 kubectl rollout status deployment/backend -n app-backend --timeout=5m
@@ -75,7 +75,7 @@ echo "  Frontend Application (app-frontend)"
 echo "═══════════════════════════════════════════"
 
 echo "🎨 Deploying Frontend..."
-envsubst < k8s/base/frontend-deployment.yaml | kubectl apply -f -
+envsubst < infra/k8s/base/frontend-deployment.yaml | kubectl apply -f -
 
 echo "⏳ Waiting for frontend deployment..."
 kubectl rollout status deployment/frontend -n app-frontend --timeout=5m
@@ -87,10 +87,10 @@ echo "  Monitoring Stack (shared)"
 echo "═══════════════════════════════════════════"
 
 echo "📊 Deploying Fluent Bit (DaemonSet)..."
-kubectl apply -f k8s/monitoring/fluent-bit/
+kubectl apply -f infra/k8s/monitoring/fluent-bit/
 
 echo "📈 Deploying Prometheus..."
-kubectl apply -f k8s/monitoring/prometheus/
+kubectl apply -f infra/k8s/monitoring/prometheus/
 
 echo "⏳ Waiting for Prometheus deployment..."
 kubectl rollout status deployment/prometheus -n shared --timeout=5m
@@ -102,7 +102,7 @@ echo "  Ingress Configuration"
 echo "═══════════════════════════════════════════"
 
 echo "🌐 Deploying Ingress..."
-kubectl apply -f k8s/base/ingress.yaml
+kubectl apply -f infra/k8s/base/ingress.yaml
 
 # Display deployment status
 echo ""

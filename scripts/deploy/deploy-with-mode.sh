@@ -36,7 +36,7 @@ fi
 
 # Step 1: Create namespaces
 echo "📦 Creating namespaces..."
-kubectl apply -f k8s/namespaces/namespaces.yaml
+kubectl apply -f infra/k8s/namespaces/namespaces.yaml
 
 # Step 2: Check secrets
 echo "🔐 Checking secrets..."
@@ -74,7 +74,7 @@ if [[ "$DEPLOY_MODE" == "azure" ]]; then
     fi
 
     # Deploy using Azure overlay
-    cd k8s/overlays/azure
+    cd infra/k8s/overlays/azure
     kustomize edit set image backend=${AZURE_CONTAINER_REGISTRY}/ai-saas-backend:${IMAGE_TAG}
     kustomize build . | envsubst | kubectl apply -f -
     cd ../../..
@@ -84,11 +84,11 @@ else
 
     # Deploy PostgreSQL
     echo "🐘 Deploying PostgreSQL..."
-    kubectl apply -f k8s/base/postgres-deployment.yaml
+    kubectl apply -f infra/k8s/base/postgres-deployment.yaml
 
     # Deploy Redis
     echo "📮 Deploying Redis..."
-    kubectl apply -f k8s/base/redis-deployment.yaml
+    kubectl apply -f infra/k8s/base/redis-deployment.yaml
 
     # Wait for database to be ready
     echo "⏳ Waiting for PostgreSQL to be ready..."
@@ -98,7 +98,7 @@ else
     kubectl wait --for=condition=ready pod -l app=redis -n app-backend --timeout=120s
 
     # Deploy using on-premise overlay
-    cd k8s/overlays/onprem
+    cd infra/k8s/overlays/onprem
     kustomize edit set image backend=${AZURE_CONTAINER_REGISTRY}/ai-saas-backend:${IMAGE_TAG}
     kustomize build . | envsubst | kubectl apply -f -
     cd ../../..
@@ -107,7 +107,7 @@ fi
 # Step 4: Deploy Backend Application
 echo ""
 echo "🔧 Deploying Backend Application..."
-envsubst < k8s/base/backend-deployment.yaml | kubectl apply -f -
+envsubst < infra/k8s/base/backend-deployment.yaml | kubectl apply -f -
 
 echo "⏳ Waiting for backend deployment..."
 kubectl rollout status deployment/backend -n app-backend --timeout=5m
@@ -126,7 +126,7 @@ echo "  Frontend Application (app-frontend)"
 echo "═══════════════════════════════════════════"
 
 echo "🎨 Deploying Frontend..."
-envsubst < k8s/base/frontend-deployment.yaml | kubectl apply -f -
+envsubst < infra/k8s/base/frontend-deployment.yaml | kubectl apply -f -
 
 echo "⏳ Waiting for frontend deployment..."
 kubectl rollout status deployment/frontend -n app-frontend --timeout=5m
@@ -138,10 +138,10 @@ echo "  Monitoring Stack (shared)"
 echo "═══════════════════════════════════════════"
 
 echo "📊 Deploying Fluent Bit (DaemonSet)..."
-kubectl apply -f k8s/monitoring/fluent-bit/
+kubectl apply -f infra/k8s/monitoring/fluent-bit/
 
 echo "📈 Deploying Prometheus..."
-kubectl apply -f k8s/monitoring/prometheus/
+kubectl apply -f infra/k8s/monitoring/prometheus/
 
 echo "⏳ Waiting for Prometheus deployment..."
 kubectl rollout status deployment/prometheus -n shared --timeout=5m
@@ -153,7 +153,7 @@ echo "  Ingress Configuration"
 echo "═══════════════════════════════════════════"
 
 echo "🌐 Deploying Ingress..."
-kubectl apply -f k8s/base/ingress.yaml
+kubectl apply -f infra/k8s/base/ingress.yaml
 
 # Display deployment status
 echo ""

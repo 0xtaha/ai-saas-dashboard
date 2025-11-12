@@ -8,7 +8,6 @@ from flask import current_app
 
 from app.extensions import db
 from app.models.file import File
-from app.services.storage_service import StorageService
 
 
 class FileService:
@@ -59,7 +58,6 @@ class FileService:
     def save_file(file, user_id):
         """
         Save uploaded file with checksum as ID
-        Uses StorageService for local or Azure Blob Storage
         Returns: (success, message, file_record or None)
         """
         # Validate file
@@ -82,24 +80,32 @@ class FileService:
         file_extension = os.path.splitext(original_filename)[1]
         stored_filename = f"{checksum}{file_extension}"
 
+        # Get upload folder from config
+        upload_folder = os.path.join(
+            current_app.root_path,
+            '..',
+            'uploaded_files'
+        )
+        os.makedirs(upload_folder, exist_ok=True)
+
+        filepath = os.path.join(upload_folder, stored_filename)
+
         # Get MIME type
         mime_type, _ = mimetypes.guess_type(original_filename)
 
-        # Save file using storage service (local or Azure Blob)
-        success, storage_message, storage_path = StorageService.save_file(
-            file_data,
-            stored_filename
-        )
-
-        if not success:
-            return False, storage_message, None
+        # Save file to disk
+        try:
+            with open(filepath, 'wb') as f:
+                f.write(file_data)
+        except Exception as e:
+            return False, f"Failed to save file: {str(e)}", None
 
         # Create database record
         file_record = File(
             checksum=checksum,
             original_filename=original_filename,
             stored_filename=stored_filename,
-            filepath=storage_path,  # This will be local path or blob URL
+            filepath=filepath,
             file_size=len(file_data),
             mime_type=mime_type,
             user_id=user_id,
@@ -109,17 +115,12 @@ class FileService:
         try:
             db.session.add(file_record)
             db.session.commit()
-
-            storage_type = os.getenv('STORAGE_TYPE', 'local')
-            current_app.logger.info(
-                f"File uploaded successfully using {storage_type} storage: {stored_filename}"
-            )
-
             return True, "File uploaded successfully", file_record
         except Exception as e:
             db.session.rollback()
             # Clean up file if database insert fails
-            StorageService.delete_file(storage_path)
+            if os.path.exists(filepath):
+                os.remove(filepath)
             return False, f"Failed to save file metadata: {str(e)}", None
 
     @staticmethod
@@ -136,17 +137,18 @@ class FileService:
 
     @staticmethod
     def delete_file(checksum, user_id):
-        """Delete a file from storage and database"""
+        """Delete a file"""
         file_record = File.query.filter_by(checksum=checksum, user_id=user_id).first()
 
         if not file_record:
             return False, "File not found"
 
-        # Delete file from storage (local or Azure Blob)
-        if file_record.filepath:
-            success, message = StorageService.delete_file(file_record.filepath)
-            if not success:
-                current_app.logger.warning(f"Failed to delete file from storage: {message}")
+        # Delete file from disk
+        if os.path.exists(file_record.filepath):
+            try:
+                os.remove(file_record.filepath)
+            except Exception as e:
+                return False, f"Failed to delete file from disk: {str(e)}"
 
         # Delete from database
         try:
@@ -156,14 +158,6 @@ class FileService:
         except Exception as e:
             db.session.rollback()
             return False, f"Failed to delete file record: {str(e)}"
-
-    @staticmethod
-    def get_file_url(checksum):
-        """Get URL or path to access the file"""
-        file_record = File.query.filter_by(checksum=checksum).first()
-        if not file_record:
-            return None
-        return StorageService.get_file_url(file_record.filepath)
 
     @staticmethod
     def mark_as_processed(checksum, processing_result):

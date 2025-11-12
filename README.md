@@ -6,6 +6,7 @@ A production-ready, enterprise-grade AI-powered file processing platform with mu
 
 - **User Authentication** - Secure JWT-based authentication with session management
 - **File Upload** - Drag-and-drop file uploads with SHA-256 checksum-based deduplication
+- **Dual Storage Modes** - Azure Blob Storage (managed) or Persistent Volumes (on-premise)
 - **AI Processing** - Automatic file processing with AI integration and status tracking
 - **Results Visualization** - Interactive display of processing results with mock data fallback
 - **File Management** - List, view, and delete uploaded files with pagination
@@ -23,14 +24,16 @@ A production-ready, enterprise-grade AI-powered file processing platform with mu
 - **Azure Kubernetes Service (AKS)** - Container orchestration
 - **Azure Database for PostgreSQL Flexible Server** - Managed database with HA
 - **Azure Cache for Redis Premium** - Managed caching with clustering
+- **Azure Blob Storage** - Managed file storage with lifecycle policies
 - **Azure Container Registry** - Private container registry
 - **Azure Log Analytics** - Centralized logging and monitoring
-- **Cost:** ~$1,140/month
+- **Cost:** ~$1,140/month + storage costs
 
 #### On-Premise Mode
 - **Azure Kubernetes Service (AKS)** - Container orchestration
 - **PostgreSQL in AKS** - Self-hosted database with persistent volumes
 - **Redis in AKS** - Self-hosted cache
+- **Persistent Volume Claims (PVC)** - File storage using Azure Files
 - **Azure Container Registry** - Private container registry
 - **Azure Log Analytics** - Centralized logging and monitoring
 - **Cost:** ~$490/month
@@ -50,6 +53,7 @@ A production-ready, enterprise-grade AI-powered file processing platform with mu
 - Redis for caching and sessions
 - JWT authentication with Flask-JWT-Extended
 - Flask-Migrate for database migrations
+- Azure Blob Storage SDK (dual storage support)
 - Gunicorn WSGI server
 
 **Infrastructure**
@@ -106,7 +110,7 @@ ai-saas-dashboard/
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── k8s/                            # Kubernetes manifests
+├── infra/k8s/                            # Kubernetes manifests
 │   ├── namespaces/
 │   │   └── namespaces.yaml        # 3 namespaces definition
 │   ├── base/                      # Base manifests
