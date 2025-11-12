@@ -2,8 +2,6 @@ name: CD - Deploy to Azure AKS
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -31,8 +29,69 @@ env:
   AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
 
 jobs:
+  check-branch:
+    name: Check Branch and Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.determine-env.outputs.environment }}
+      branch: ${{ steps.determine-env.outputs.branch }}
+      should_deploy: ${{ steps.determine-env.outputs.should_deploy }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine environment from branch
+        id: determine-env
+        run: |
+          # For manual workflow dispatch
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "branch=manual" >> $GITHUB_OUTPUT
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For tag push, determine which branch the tag is on
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "Processing tag: $TAG"
+
+          # Find which branch contains this tag
+          BRANCHES=$(git branch -r --contains "$TAG" | grep -E 'origin/(main|staging|dev)' | sed 's/.*origin\///')
+
+          if [[ -z "$BRANCHES" ]]; then
+            echo "❌ Tag $TAG is not on any of the allowed branches (main, staging, dev)"
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Determine environment based on branch
+          if echo "$BRANCHES" | grep -q "^main$"; then
+            ENV="prod"
+            BRANCH="main"
+          elif echo "$BRANCHES" | grep -q "^staging$"; then
+            ENV="staging"
+            BRANCH="staging"
+          elif echo "$BRANCHES" | grep -q "^dev$"; then
+            ENV="dev"
+            BRANCH="dev"
+          else
+            echo "❌ Tag $TAG is not on any of the allowed branches (main, staging, dev)"
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "✅ Tag $TAG found on branch: $BRANCH"
+          echo "🎯 Deploying to environment: $ENV"
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+
   build-and-push:
     name: Build and Push Docker Images
+    needs: check-branch
+    if: needs.check-branch.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
@@ -102,27 +161,26 @@ jobs:
 
   deploy-to-aks:
     name: Deploy to AKS
-    needs: build-and-push
+    needs: [check-branch, build-and-push]
+    if: needs.check-branch.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.event.inputs.environment || 'prod' }}
+      name: ${{ needs.check-branch.outputs.environment }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set environment and deployment mode
+      - name: Set deployment mode and environment
         id: set-env
         run: |
-          if [[ "${{ github.event.inputs.environment }}" != "" ]]; then
-            ENV="${{ github.event.inputs.environment }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            ENV="prod"
-          else
-            ENV="staging"
-          fi
+          # Environment is determined by check-branch job
+          ENV="${{ needs.check-branch.outputs.environment }}"
           echo "environment=$ENV" >> $GITHUB_OUTPUT
           echo "DEPLOY_ENV=$ENV" >> $GITHUB_ENV
+
+          echo "📦 Deploying to environment: $ENV"
+          echo "🌿 From branch: ${{ needs.check-branch.outputs.branch }}"
 
           # Set deployment mode (default to secret if not provided)
           if [[ "${{ github.event.inputs.deployment_mode }}" != "" ]]; then
@@ -294,8 +352,8 @@ jobs:
 
   rollback:
     name: Rollback Deployment
-    needs: [build-and-push, deploy-to-aks]
-    if: failure()
+    needs: [check-branch, build-and-push, deploy-to-aks]
+    if: failure() && needs.check-branch.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
 
     steps:

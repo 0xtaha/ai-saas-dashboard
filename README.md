@@ -233,10 +233,18 @@ Access the application:
 
 ## 📚 Documentation
 
+### Getting Started
 - **[Quick Start Guide](QUICK_START.md)** - Get started quickly with common commands
 - **[Deployment Modes](DEPLOYMENT_MODES.md)** - Detailed comparison and setup for both modes
-- **[Terraform Infrastructure](infra/terraform/README.md)** - Infrastructure as Code documentation
+- **[Release Process](RELEASE_PROCESS.md)** - Git tagging strategy and deployment workflow
+
+### Architecture & Design
+- **[Azure Architecture](docs/ARCHITECTURE_AZURE.md)** - Complete Azure managed services architecture with Mermaid diagrams
+- **[On-Premise Architecture](docs/ARCHITECTURE_ONPREMISE.md)** - In-cluster deployment architecture with scalability and security details
 - **[Namespace Architecture](NAMESPACE_ARCHITECTURE.md)** - Multi-namespace design and patterns
+
+### Infrastructure & CI/CD
+- **[Terraform Infrastructure](infra/terraform/README.md)** - Infrastructure as Code documentation
 - **[CI/CD Pipeline](CICD_README.md)** - GitHub Actions workflow documentation
 
 ## 🔧 Configuration
