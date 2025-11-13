@@ -23,11 +23,21 @@ const FileList = ({ refreshTrigger, onFileSelect }) => {
 
     try {
       const response = await filesAPI.list(page, 20);
-      console.log('Files API response:', response);
+      console.log('=== FILES API DEBUG ===');
+      console.log('Full response:', JSON.stringify(response, null, 2));
+      console.log('response.success:', response.success);
+      console.log('response.data:', response.data);
+      console.log('response.data.files:', response.data?.files);
+      console.log('Files array length:', response.data?.files?.length);
+
       if (response.success) {
-        setFiles(response.data.files || []);
+        const filesList = response.data.files || [];
+        console.log('Setting files to state:', filesList);
+        console.log('Number of files:', filesList.length);
+        setFiles(filesList);
         setPagination(response.data.pagination || pagination);
       } else {
+        console.log('Response not successful:', response.message);
         setError(response.message || 'Failed to load files');
       }
     } catch (err) {
@@ -72,6 +82,8 @@ const FileList = ({ refreshTrigger, onFileSelect }) => {
       <span className="badge badge-warning">Processing</span>
     );
   };
+
+  console.log('FileList render - loading:', loading, 'files count:', files.length, 'error:', error);
 
   if (loading && files.length === 0) {
     return <div className="loading">Loading files...</div>;
