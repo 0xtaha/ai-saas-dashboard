@@ -143,8 +143,8 @@ def login():
             data.get('password')
         )
         user_dict = user.to_dict()
-        # Use only user ID as JWT identity (subject must be a simple type)
-        token = create_access_token(identity=user_dict['id'])
+        # Use only user ID as JWT identity (must be string for JWT 'sub' claim)
+        token = create_access_token(identity=str(user_dict['id']))
 
         return success_response({
             'access_token': token,

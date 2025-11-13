@@ -63,7 +63,7 @@ def upload_file():
       401:
         description: Unauthorized - missing or invalid token
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # Convert string ID to integer
 
     # Check if file is in request
     if 'file' not in request.files:
@@ -168,7 +168,7 @@ def list_files():
       401:
         description: Unauthorized - missing or invalid token
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # Convert string ID to integer
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -234,7 +234,7 @@ def get_file(checksum):
       404:
         description: File not found
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # Convert string ID to integer
 
     file_record = FileService.get_file_by_checksum(checksum)
 
@@ -286,7 +286,7 @@ def delete_file(checksum):
       404:
         description: File not found
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # Convert string ID to integer
 
     success, message = FileService.delete_file(checksum, user_id)
 
@@ -352,7 +352,7 @@ def get_processing_status(checksum):
       404:
         description: File not found
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # Convert string ID to integer
 
     file_record = FileService.get_file_by_checksum(checksum)
 
