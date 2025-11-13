@@ -193,9 +193,8 @@ The frontend communicates with these backend endpoints:
 
 ### Authentication
 - `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
+- `POST /api/auth/login` - User login (returns user info and access token)
 - `POST /api/auth/logout` - User logout
-- `GET /api/auth/profile` - Get user profile
 
 ### Files
 - `POST /api/files/upload` - Upload file

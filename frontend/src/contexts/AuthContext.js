@@ -11,32 +11,28 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check if user is logged in on mount
     const token = localStorage.getItem('token');
-    if (token) {
-      loadUser();
-    } else {
-      setLoading(false);
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Failed to parse saved user:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setIsAuthenticated(false);
+      }
     }
+    setLoading(false);
   }, []);
-
-  const loadUser = async () => {
-    try {
-      const response = await authAPI.getProfile();
-      setUser(response.data);
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Failed to load user:', error);
-      localStorage.removeItem('token');
-      setIsAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const login = async (email, password) => {
     try {
       const response = await authAPI.login(email, password);
+      const userData = response.data.user;
+      setUser(userData);
       setIsAuthenticated(true);
-      await loadUser();
+      localStorage.setItem('user', JSON.stringify(userData));
       return { success: true, data: response.data };
     } catch (error) {
       return {
@@ -67,6 +63,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
     }
   };
 

@@ -59,11 +59,6 @@ export const authAPI = {
       localStorage.removeItem('token');
     }
   },
-
-  getProfile: async () => {
-    const response = await api.get('/auth/profile');
-    return response.data;
-  },
 };
 
 // Files API
