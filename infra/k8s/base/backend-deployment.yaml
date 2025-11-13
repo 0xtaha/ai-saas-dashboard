@@ -30,6 +30,9 @@ data:
   UPLOAD_FOLDER: "/app/uploaded_files"
   MAX_CONTENT_LENGTH: "16777216"
   LOG_LEVEL: "INFO"
+
+  # CORS Configuration
+  CORS_ORIGINS: "*"  # Set to specific frontend URL in production
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -140,6 +143,11 @@ spec:
             secretKeyRef:
               name: backend-secrets
               key: AI_API_KEY
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: CORS_ORIGINS
         volumeMounts:
         - name: uploaded-files
           mountPath: /app/uploaded_files

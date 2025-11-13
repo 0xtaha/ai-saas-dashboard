@@ -288,6 +288,15 @@ REDIS_PORT=6379
 REDIS_SSL=false
 ```
 
+**CORS Configuration:**
+```env
+# For development (allows all origins)
+CORS_ORIGINS=*
+
+# For production (specific frontend URLs)
+CORS_ORIGINS=https://app.example.com,https://www.example.com
+```
+
 ### GitHub Secrets
 
 Required secrets for CI/CD:

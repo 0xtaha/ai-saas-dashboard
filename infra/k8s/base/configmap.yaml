@@ -11,3 +11,6 @@ data:
   REDIS_PORT: "6379"
   DATABASE_HOST: "postgres-service"
   DATABASE_PORT: "5432"
+
+  # CORS Configuration
+  CORS_ORIGINS: "*"  # Set to specific frontend URL in production

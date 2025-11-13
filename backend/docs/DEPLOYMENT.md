@@ -20,6 +20,12 @@ DATABASE_URL=postgresql://user:password@localhost/dbname
 OPENAI_API_KEY=your-openai-api-key
 UPLOAD_FOLDER=/path/to/uploads
 MAX_CONTENT_LENGTH=10485760
+
+# CORS Configuration
+# Comma-separated list of allowed origins
+# For development: Use * to allow all origins
+# For production: Use specific URLs like "https://app.example.com,https://www.example.com"
+CORS_ORIGINS=*
 ```
 
 ## Installation
