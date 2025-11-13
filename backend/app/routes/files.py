@@ -63,7 +63,7 @@ def upload_file():
       401:
         description: Unauthorized - missing or invalid token
     """
-    user_id = get_jwt_identity()['id']
+    user_id = get_jwt_identity()
 
     # Check if file is in request
     if 'file' not in request.files:
@@ -168,7 +168,7 @@ def list_files():
       401:
         description: Unauthorized - missing or invalid token
     """
-    user_id = get_jwt_identity()['id']
+    user_id = get_jwt_identity()
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -189,8 +189,52 @@ def list_files():
 @files_bp.route('/<string:checksum>', methods=['GET'])
 @jwt_required()
 def get_file(checksum):
-    """Get specific file details by checksum"""
-    user_id = get_jwt_identity()['id']
+    """Get specific file details by checksum
+    ---
+    tags:
+      - Files
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: checksum
+        type: string
+        required: true
+        description: File checksum (SHA256)
+    responses:
+      200:
+        description: File retrieved successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: File retrieved successfully
+            data:
+              type: object
+              properties:
+                file:
+                  type: object
+                  properties:
+                    checksum:
+                      type: string
+                    filename:
+                      type: string
+                    file_size:
+                      type: integer
+                    is_processed:
+                      type: boolean
+      401:
+        description: Unauthorized - missing or invalid token
+      403:
+        description: Access denied - user doesn't own the file
+      404:
+        description: File not found
+    """
+    user_id = get_jwt_identity()
 
     file_record = FileService.get_file_by_checksum(checksum)
 
@@ -209,8 +253,40 @@ def get_file(checksum):
 @files_bp.route('/<string:checksum>', methods=['DELETE'])
 @jwt_required()
 def delete_file(checksum):
-    """Delete a file by checksum"""
-    user_id = get_jwt_identity()['id']
+    """Delete a file by checksum
+    ---
+    tags:
+      - Files
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: checksum
+        type: string
+        required: true
+        description: File checksum (SHA256)
+    responses:
+      200:
+        description: File deleted successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: File deleted successfully
+      400:
+        description: Bad request - deletion failed
+      401:
+        description: Unauthorized - missing or invalid token
+      403:
+        description: Access denied - user doesn't own the file
+      404:
+        description: File not found
+    """
+    user_id = get_jwt_identity()
 
     success, message = FileService.delete_file(checksum, user_id)
 
@@ -223,8 +299,60 @@ def delete_file(checksum):
 @files_bp.route('/<string:checksum>/processing-status', methods=['GET'])
 @jwt_required()
 def get_processing_status(checksum):
-    """Get file processing status"""
-    user_id = get_jwt_identity()['id']
+    """Get file processing status
+    ---
+    tags:
+      - Files
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: checksum
+        type: string
+        required: true
+        description: File checksum (SHA256)
+    responses:
+      200:
+        description: Processing status retrieved successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: Processing status retrieved successfully
+            data:
+              type: object
+              properties:
+                checksum:
+                  type: string
+                is_processed:
+                  type: boolean
+                processed_at:
+                  type: string
+                  format: date-time
+                processing_result:
+                  type: object
+                latest_request:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    status:
+                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
+      401:
+        description: Unauthorized - missing or invalid token
+      403:
+        description: Access denied - user doesn't own the file
+      404:
+        description: File not found
+    """
+    user_id = get_jwt_identity()
 
     file_record = FileService.get_file_by_checksum(checksum)
 

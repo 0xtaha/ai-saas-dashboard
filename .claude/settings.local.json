@@ -5,7 +5,9 @@
       "Bash(cat:*)",
       "Bash(dir)",
       "Bash(move k8s infrak8s)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(python -m pip:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

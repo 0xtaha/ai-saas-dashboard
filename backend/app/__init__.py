@@ -24,6 +24,19 @@ def create_app(config_name='development'):
             'name': 'API Support',
             'email': 'support@example.com'
         },
+        'securityDefinitions': {
+            'Bearer': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
+            }
+        },
+        'security': [
+            {
+                'Bearer': []
+            }
+        ],
         'specs': [
             {
                 'endpoint': 'apispec',

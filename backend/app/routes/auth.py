@@ -142,12 +142,13 @@ def login():
             data.get('email'),
             data.get('password')
         )
-        user = user.to_dict()
-        token = create_access_token(identity=user)
+        user_dict = user.to_dict()
+        # Use only user ID as JWT identity (subject must be a simple type)
+        token = create_access_token(identity=user_dict['id'])
 
         return success_response({
             'access_token': token,
-            'user': user
+            'user': user_dict
         }, 'Login successful')
     except ValueError as e:
         return error_response(str(e), 401)
