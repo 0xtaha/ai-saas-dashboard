@@ -8,28 +8,28 @@ from app.extensions import db
 class AuthService:
     """Handle authentication logic"""
     
-    def register_user(self, username, password, email=None):
+    def register_user(self, username, password, email):
         """Register a new user"""
         if not username or not password:
             raise ValueError("Username and password required")
         
-        if User.query.filter_by(username=username).first():
+        if User.query.filter_by(email=email, username=username).first():
             raise ValueError("User already exists")
         
         user = User(username=username, email=email)
         user.set_password(password)
-        # todo : add support for using 
+        # todo : add support for using AD
         db.session.add(user)
         db.session.commit()
         
         return user
     
-    def authenticate_user(self, username, password):
+    def authenticate_user(self, email, password):
         """Authenticate user credentials"""
-        if not username or not password:
+        if not email or not password:
             raise ValueError("Username and password required")
         
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(email=email).first()
         
         if not user or not user.check_password(password):
             raise ValueError("Invalid credentials")

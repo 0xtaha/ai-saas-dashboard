@@ -23,6 +23,7 @@ class AIService:
         file_record = File.query.filter_by(checksum=file_checksum).first()
         if not file_record:
             return False, "File not found", None
+        # todo: adding redis caching for processing status montioring
 
         # Check if file was already processed
         if file_record.is_processed:
@@ -131,14 +132,19 @@ class AIService:
         }
 
         try:
-            response = requests.post(
-                api_url,
-                json=payload,
-                headers=headers,
-                timeout=60
-            )
-            response.raise_for_status()
-            return response.json()
+            # using mock response until integration with AI service is complite
+            response = {
+                'success' : True,
+                'result' : 'Mock response, file processed'
+            }
+            # response = requests.post(
+            #     api_url,
+            #     json=payload,
+            #     headers=headers,
+            #     timeout=60
+            # )
+            # response.raise_for_status()
+            # return response.json()
         except requests.exceptions.RequestException as e:
             return {
                 'success': False,

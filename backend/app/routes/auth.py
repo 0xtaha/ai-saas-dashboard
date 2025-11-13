@@ -92,6 +92,7 @@ def login():
         schema:
           type: object
           required:
+            - email
             - password
           properties:
             email:
@@ -99,10 +100,6 @@ def login():
               format: email
               example: john@example.com
               description: Email or username for login
-            username:
-              type: string
-              example: johndoe
-              description: Username (alternative to email)
             password:
               type: string
               format: password
@@ -141,14 +138,12 @@ def login():
     """
     try:
         data = request.get_json()
-        # Accept both email and username for login
-        identifier = data.get('email') or data.get('username')
         user = auth_service.authenticate_user(
-            identifier,
+            data.get('email'),
             data.get('password')
         )
-
-        token = create_access_token(identity=user.username)
+        user = user.to_dict()
+        token = create_access_token(identity=user)
 
         return success_response({
             'access_token': token,
@@ -226,8 +221,8 @@ def get_profile():
 
     @jwt_required()
     def _get_profile():
-        username = get_jwt_identity()
-        user = User.query.filter_by(username=username).first()
+        user_id = get_jwt_identity()['id']
+        user = User.query.filter_by(id=user_id).first()
 
         if not user:
             return error_response('User not found', 404)

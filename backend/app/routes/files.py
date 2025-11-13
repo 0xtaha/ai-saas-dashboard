@@ -63,7 +63,7 @@ def upload_file():
       401:
         description: Unauthorized - missing or invalid token
     """
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()['id']
 
     # Check if file is in request
     if 'file' not in request.files:
@@ -168,7 +168,7 @@ def list_files():
       401:
         description: Unauthorized - missing or invalid token
     """
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()['id']
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -190,7 +190,7 @@ def list_files():
 @jwt_required()
 def get_file(checksum):
     """Get specific file details by checksum"""
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()['id']
 
     file_record = FileService.get_file_by_checksum(checksum)
 
@@ -210,7 +210,7 @@ def get_file(checksum):
 @jwt_required()
 def delete_file(checksum):
     """Delete a file by checksum"""
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()['id']
 
     success, message = FileService.delete_file(checksum, user_id)
 
@@ -224,7 +224,7 @@ def delete_file(checksum):
 @jwt_required()
 def get_processing_status(checksum):
     """Get file processing status"""
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()['id']
 
     file_record = FileService.get_file_by_checksum(checksum)
 

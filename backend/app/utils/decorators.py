@@ -32,7 +32,7 @@ def admin_required():
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
-            user_id = get_jwt_identity()
+            user_id = get_jwt_identity()['id']
             # TODO: Check if user is admin
             # For now, just pass through
             return f(*args, **kwargs)
