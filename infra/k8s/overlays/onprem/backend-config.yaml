@@ -23,5 +23,8 @@ data:
   UPLOAD_FOLDER: "/app/uploaded_files"
   MAX_CONTENT_LENGTH: "16777216"  # 16MB
 
+  # CORS Configuration
+  CORS_ORIGINS: "*"  # Set to specific frontend URL in production
+
   # Logging
   LOG_LEVEL: "INFO"

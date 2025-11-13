@@ -9,15 +9,23 @@ from app.extensions import db, jwt, migrate, cors
 def create_app(config_name='development'):
     """Create and configure Flask application"""
     app = Flask(__name__)
-    
+
     # Load configuration
     app.config.from_object(config[config_name])
-    
+
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db)
-    cors.init_app(app)
+
+    # Initialize CORS with configuration
+    cors.init_app(
+        app,
+        origins=app.config['CORS_ORIGINS'],
+        allow_headers=app.config['CORS_ALLOW_HEADERS'],
+        methods=app.config['CORS_METHODS'],
+        supports_credentials=app.config['CORS_SUPPORTS_CREDENTIALS']
+    )
     
     # Register blueprints
     from app.routes import register_blueprints

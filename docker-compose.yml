@@ -31,6 +31,7 @@ services:
       - AI_API_KEY=${AI_API_KEY}
       - STORAGE_TYPE=local
       - UPLOAD_FOLDER=/app/uploaded_files
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:80
     volumes:
       - uploaded_files:/app/uploaded_files
       - ./backend/logs:/app/logs
