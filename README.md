@@ -30,13 +30,12 @@ A production-ready, enterprise-grade AI-powered file processing platform with mu
 - **Cost:** ~$1,140/month + storage costs
 
 #### On-Premise Mode
-- **Azure Kubernetes Service (AKS)** - Container orchestration
-- **PostgreSQL in AKS** - Self-hosted database with persistent volumes
-- **Redis in AKS** - Self-hosted cache
+- **k8 (AKS)** - Container orchestration
+- **PostgreSQL on k8** - Self-hosted database with persistent volumes
+- **Redis on k8** - Self-hosted cache
 - **Persistent Volume Claims (PVC)** - File storage using Azure Files
-- **Azure Container Registry** - Private container registry
-- **Azure Log Analytics** - Centralized logging and monitoring
-- **Cost:** ~$490/month
+- **docker registry** - Private container registry
+- **fluent-bit/prometheus** - Centralized logging and monitoring
 
 ### Tech Stack
 
@@ -50,22 +49,16 @@ A production-ready, enterprise-grade AI-powered file processing platform with mu
 **Backend**
 - Flask 3.0 with SQLAlchemy ORM
 - PostgreSQL 15 with connection pooling
-- Redis for caching and sessions
+- Redis for caching and sessions ( Not used yet )
 - JWT authentication with Flask-JWT-Extended
 - Flask-Migrate for database migrations
 - Azure Blob Storage SDK (dual storage support)
 - Gunicorn WSGI server
 
-**Infrastructure**
-- Kubernetes 1.28 on Azure AKS
-- Docker multi-stage builds
-- Helm charts for package management
-- Kustomize for environment-specific configs
-- Terraform for infrastructure provisioning
 
-**Monitoring & Observability**
+**Monitoring & Observability** ( setup not fully supported )
 - Fluent Bit for log aggregation
-- Prometheus for metrics collection
+- Prometheus for metrics collection 
 - Azure Log Analytics for centralized logs
 - Application Insights for APM
 - Grafana dashboards (optional)
@@ -262,6 +255,7 @@ Access the application:
 ### Infrastructure & CI/CD
 - **[Terraform Infrastructure](infra/terraform/README.md)** - Infrastructure as Code documentation
 - **[CI/CD Pipeline](docs/CICD_README.md)** - Complete GitHub Actions workflow guide
+- **[CI/CD Flow Diagrams](docs/CICD_FLOW_DIAGRAM.md)** - Visual Mermaid diagrams of the complete pipeline
 
 ## 🔧 Configuration
 

@@ -10,6 +10,261 @@ main (production)
   └── dev (development)
 ```
 
+## CI/CD Flow Diagram
+
+```mermaid
+graph TB
+    subgraph "Developer Actions"
+        A[Developer pushes to dev] --> B{Trigger Type}
+        C[Developer creates PR] --> D[CI Workflow]
+        E[Developer pushes tag to staging/main] --> F{Tag Validation}
+    end
+
+    subgraph "CI Workflow - Continuous Integration"
+        D --> G[Backend Tests]
+        D --> H[Frontend Tests]
+        D --> I[Security Scan]
+
+        G --> J{All Tests Pass?}
+        H --> J
+        I --> J
+
+        J -->|Yes| K[CI Success ✅]
+        J -->|No| L[CI Failed ❌]
+        L --> M[Block Merge/Deployment]
+    end
+
+    subgraph "CD Workflow - Dev Branch"
+        B -->|Push to dev| N[Wait for CI]
+        K --> N
+        N --> O[Build Docker Images]
+        O --> P[Tag: dev-{hash}]
+        P --> Q[Push to ACR]
+        Q --> R[Security Scan Images]
+        R --> S[Deploy to Dev Environment]
+        S --> T{Deploy Success?}
+        T -->|Yes| U[Dev Deployed ✅]
+        T -->|No| V[Auto Rollback]
+        V --> W[Notify Failure]
+    end
+
+    subgraph "CD Workflow - Staging/Main Branches"
+        F -->|Valid Tag| X[Wait for CI]
+        K --> X
+        X --> Y[Determine Environment]
+        Y --> Z{Which Branch?}
+
+        Z -->|staging| AA[Build for Staging]
+        Z -->|main| AB[Build for Production]
+
+        AA --> AC[Tag: v1.0.0-rc.1 + latest]
+        AB --> AD[Tag: v1.0.0 + latest]
+
+        AC --> AE[Push to ACR]
+        AD --> AE
+
+        AE --> AF[Security Scan Images]
+        AF --> AG[Create K8s Secrets]
+        AG --> AH[Deploy Infrastructure]
+        AH --> AI{Deployment Mode?}
+
+        AI -->|onprem| AJ[Deploy PostgreSQL + Redis]
+        AI -->|azure| AK[Use Azure Managed Services]
+
+        AJ --> AL[Deploy Backend]
+        AK --> AL
+
+        AL --> AM[Deploy Frontend]
+        AM --> AN[Deploy Monitoring]
+        AN --> AO{Environment?}
+
+        AO -->|main| AP[Deploy Ingress]
+        AO -->|staging| AQ[Skip Ingress]
+
+        AP --> AR[Run DB Migrations]
+        AQ --> AR
+
+        AR --> AS[Health Checks]
+        AS --> AT{Deploy Success?}
+
+        AT -->|Yes| AU[Deployed ✅]
+        AT -->|No| AV[Auto Rollback]
+
+        AV --> AW[Undo Backend]
+        AW --> AX[Undo Frontend]
+        AX --> AY[Notify Failure]
+    end
+
+    subgraph "Notifications"
+        U --> AZ[Send Slack Notification]
+        AU --> AZ
+        W --> AZ
+        AY --> AZ
+    end
+
+    style D fill:#4CAF50
+    style K fill:#4CAF50
+    style L fill:#f44336
+    style U fill:#4CAF50
+    style AU fill:#4CAF50
+    style V fill:#FF9800
+    style AV fill:#FF9800
+    style M fill:#f44336
+```
+
+## Detailed CI/CD Flow by Branch
+
+### Dev Branch Flow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Git as Git Repository
+    participant CI as CI Workflow
+    participant CD as CD Workflow
+    participant ACR as Azure Container Registry
+    participant AKS as Azure AKS (Dev)
+
+    Dev->>Git: Push to dev branch
+    Git->>CI: Trigger CI Workflow
+
+    par Backend Tests
+        CI->>CI: Run Python linting (flake8)
+        CI->>CI: Run pytest with coverage
+    and Frontend Tests
+        CI->>CI: Run ESLint
+        CI->>CI: Run Jest tests
+        CI->>CI: Build production bundle
+    and Security
+        CI->>CI: Run Trivy filesystem scan
+    end
+
+    alt CI Success
+        CI->>CD: Trigger CD via workflow_run
+        CD->>CD: Check CI status (must be success)
+        CD->>CD: Build Docker images
+        CD->>CD: Tag images (dev-a1b2c3d4)
+        CD->>ACR: Push images to ACR
+        CD->>CD: Scan Docker images (Trivy)
+        CD->>AKS: Deploy to dev environment
+        AKS->>CD: Deployment successful
+        CD->>Dev: Notify success ✅
+    else CI Failed
+        CI->>Dev: Block deployment ❌
+        CI->>Dev: Show test failures
+    end
+```
+
+### Staging/Main Branch Flow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Git as Git Repository
+    participant CI as CI Workflow
+    participant CD as CD Workflow
+    participant ACR as Azure Container Registry
+    participant AKS as Azure AKS
+    participant Azure as Azure Services
+
+    Dev->>Git: Push tag (v1.0.0 or v1.0.0-rc.1)
+    Git->>CD: Trigger CD Workflow
+
+    CD->>CD: Validate tag on correct branch
+    CD->>CI: Wait for CI to complete
+
+    alt CI Success
+        CI->>CD: CI passed ✅
+        CD->>CD: Determine environment (staging/main)
+        CD->>CD: Build Docker images
+
+        alt Staging
+            CD->>CD: Tag images (v1.0.0-rc.1 + latest)
+        else Main
+            CD->>CD: Tag images (v1.0.0 + latest)
+        end
+
+        CD->>ACR: Push images to ACR
+        CD->>CD: Scan Docker images (Trivy)
+        CD->>AKS: Login to AKS cluster
+        CD->>AKS: Create/Update K8s secrets
+
+        alt Deployment Mode: onprem
+            CD->>AKS: Deploy PostgreSQL
+            CD->>AKS: Deploy Redis
+        else Deployment Mode: azure
+            CD->>Azure: Use managed PostgreSQL
+            CD->>Azure: Use managed Redis
+        end
+
+        CD->>AKS: Deploy Backend (rolling update)
+        CD->>AKS: Deploy Frontend (rolling update)
+        CD->>AKS: Deploy Monitoring (Prometheus + Fluent Bit)
+
+        alt Environment: main
+            CD->>AKS: Deploy Ingress with SSL
+        end
+
+        CD->>AKS: Run database migrations
+        CD->>AKS: Verify rollout status
+
+        alt Deployment Success
+            AKS->>CD: All pods healthy ✅
+            CD->>Dev: Notify success
+        else Deployment Failed
+            AKS->>CD: Pods failing ❌
+            CD->>AKS: Rollback backend
+            CD->>AKS: Rollback frontend
+            CD->>Dev: Notify failure + rollback
+        end
+    else CI Failed
+        CI->>CD: CI failed ❌
+        CD->>Dev: Abort deployment
+    end
+```
+
+## Complete Workflow States
+
+```mermaid
+stateDiagram-v2
+    [*] --> FeatureBranch: Create feature branch
+
+    FeatureBranch --> PullRequest: Push & create PR
+    PullRequest --> CI_Running: CI triggered
+
+    CI_Running --> CI_Success: All tests pass
+    CI_Running --> CI_Failed: Tests fail
+
+    CI_Failed --> FeatureBranch: Fix issues
+    CI_Success --> Merged_Dev: Merge to dev
+
+    Merged_Dev --> Dev_CI: CI runs on push
+    Dev_CI --> Dev_CD: CI passes
+    Dev_CD --> Dev_Deployed: Auto-deploy
+
+    Dev_Deployed --> Merged_Staging: Merge to staging
+    Merged_Staging --> Staging_CI: CI runs
+    Staging_CI --> Tag_Staging: Create RC tag
+    Tag_Staging --> Staging_CD: CD triggered
+    Staging_CD --> Staging_Deployed: Deploy staging
+
+    Staging_Deployed --> Merged_Main: Merge to main
+    Merged_Main --> Main_CI: CI runs on PR
+    Main_CI --> Tag_Main: Create prod tag
+    Tag_Main --> Main_CD: CD triggered
+    Main_CD --> Production_Deployed: Deploy production
+
+    Production_Deployed --> [*]
+
+    Dev_CD --> Rollback_Dev: Deploy fails
+    Staging_CD --> Rollback_Staging: Deploy fails
+    Main_CD --> Rollback_Main: Deploy fails
+
+    Rollback_Dev --> Dev_Deployed: Auto-rollback
+    Rollback_Staging --> Staging_Deployed: Auto-rollback
+    Rollback_Main --> Production_Deployed: Auto-rollback
+```
+
 ### Branch Overview
 
 | Branch | Purpose | Protection | Deployment Target |
