@@ -12,9 +12,56 @@ files_bp = Blueprint('files', __name__)
 @files_bp.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_file():
-    """
-    Upload a file, validate it, save with checksum as ID,
-    and send to AI server for processing if not already processed
+    """Upload a file and process with AI
+    ---
+    tags:
+      - Files
+    security:
+      - Bearer: []
+    consumes:
+      - multipart/form-data
+    parameters:
+      - in: formData
+        name: file
+        type: file
+        required: true
+        description: File to upload
+    responses:
+      201:
+        description: File uploaded and processed successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+            data:
+              type: object
+              properties:
+                file:
+                  type: object
+                  properties:
+                    checksum:
+                      type: string
+                    filename:
+                      type: string
+                    file_size:
+                      type: integer
+                    is_processed:
+                      type: boolean
+                ai_processing:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                    message:
+                      type: string
+      400:
+        description: Bad request - no file or invalid file
+      401:
+        description: Unauthorized - missing or invalid token
     """
     user_id = get_jwt_identity()
 
@@ -62,7 +109,65 @@ def upload_file():
 @files_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_files():
-    """List user's files with pagination"""
+    """List user's files with pagination
+    ---
+    tags:
+      - Files
+    security:
+      - Bearer: []
+    parameters:
+      - in: query
+        name: page
+        type: integer
+        default: 1
+        description: Page number
+      - in: query
+        name: per_page
+        type: integer
+        default: 20
+        description: Items per page
+    responses:
+      200:
+        description: Files retrieved successfully
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: Files retrieved successfully
+            data:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      checksum:
+                        type: string
+                      filename:
+                        type: string
+                      file_size:
+                        type: integer
+                      is_processed:
+                        type: boolean
+                pagination:
+                  type: object
+                  properties:
+                    page:
+                      type: integer
+                    per_page:
+                      type: integer
+                    total:
+                      type: integer
+                    pages:
+                      type: integer
+      401:
+        description: Unauthorized - missing or invalid token
+    """
     user_id = get_jwt_identity()
 
     page = request.args.get('page', 1, type=int)

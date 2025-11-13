@@ -3,7 +3,7 @@ Application factory pattern
 """
 from flask import Flask
 from app.config import config
-from app.extensions import db, jwt, migrate, cors
+from app.extensions import db, jwt, migrate, cors, swagger
 
 
 def create_app(config_name='development'):
@@ -13,10 +13,35 @@ def create_app(config_name='development'):
     # Load configuration
     app.config.from_object(config[config_name])
 
+    # Swagger configuration
+    app.config['SWAGGER'] = {
+        'title': 'AI SaaS Dashboard API',
+        'uiversion': 3,
+        'version': '1.0.0',
+        'description': 'API documentation for AI SaaS Dashboard',
+        'termsOfService': '',
+        'contact': {
+            'name': 'API Support',
+            'email': 'support@example.com'
+        },
+        'specs': [
+            {
+                'endpoint': 'apispec',
+                'route': '/apispec.json',
+                'rule_filter': lambda rule: True,
+                'model_filter': lambda tag: True,
+            }
+        ],
+        'static_url_path': '/flasgger_static',
+        'swagger_ui': True,
+        'specs_route': '/api/docs/'
+    }
+
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db)
+    swagger.init_app(app)
 
     # Initialize CORS with configuration
     cors.init_app(
@@ -26,13 +51,13 @@ def create_app(config_name='development'):
         methods=app.config['CORS_METHODS'],
         supports_credentials=app.config['CORS_SUPPORTS_CREDENTIALS']
     )
-    
+
     # Register blueprints
     from app.routes import register_blueprints
     register_blueprints(app)
-    
+
     # Register error handlers
     from app.middleware.error_handler import register_error_handlers
     register_error_handlers(app)
-    
+
     return app
