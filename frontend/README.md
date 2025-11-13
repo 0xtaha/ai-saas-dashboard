@@ -225,10 +225,18 @@ const response = await filesAPI.list(page, 20); // 20 = items per page
 ## Troubleshooting
 
 ### CORS Errors
-If you see CORS errors, ensure the backend is configured to allow requests from `http://localhost:3000`:
-```python
-CORS_ORIGINS=http://localhost:3000
+If you see CORS errors, ensure the backend is configured to allow requests from `http://localhost:3000`.
+
+**Backend CORS Configuration** (`.env` or environment variables):
+```bash
+# For development (allows all origins)
+CORS_ORIGINS=*
+
+# For production (specific origins only)
+CORS_ORIGINS=http://localhost:3000,https://your-frontend-domain.com
 ```
+
+The backend CORS configuration is set in `backend/app/config.py` and can be customized per environment.
 
 ### API Connection Failed
 1. Verify backend is running on `http://localhost:5000`
