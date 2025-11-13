@@ -1,48 +1,19 @@
-# Example Terraform variables file
-# Copy this file to terraform.tfvars and update with your values
-
-# Project Configuration
-project_name = "ai-saas-dashboard"
-environment  = "prod"
-location     = "East US"
-
-# Deployment Mode: "azure" for managed services, "onprem" for in-cluster
-deployment_mode = "azure"
-
-# AKS Configuration
-aks_node_count     = 3
-aks_node_size      = "Standard_D4s_v3"
-aks_min_node_count = 2
-aks_max_node_count = 10
-
-# PostgreSQL Configuration (only used when deployment_mode = "azure")
-postgres_sku_name              = "GP_Standard_D4s_v3"
-postgres_storage_mb            = 131072 # 128 GB
-postgres_version               = "15"
-postgres_admin_username        = "dbadmin"
-postgres_backup_retention_days = 7
-
-# Redis Configuration (only used when deployment_mode = "azure")
-redis_sku      = "Premium"
-redis_family   = "P"
-redis_capacity = 1
-
-# Container Registry
-acr_sku = "Premium"
-
-# Monitoring
-log_analytics_retention_days = 30
-
-# Networking
-vnet_address_space           = ["10.0.0.0/16"]
-aks_subnet_address_prefix    = "10.0.1.0/24"
-postgres_subnet_address_prefix = "10.0.2.0/24"
-redis_subnet_address_prefix  = "10.0.3.0/24"
-
-# Tags
-tags = {
-  Project     = "AI SaaS Dashboard"
-  ManagedBy   = "Terraform"
-  Environment = "Production"
-  CostCenter  = "Engineering"
-}
+# Terraform Configuration Structure
+# =====================================
+# This project uses separate directories for different deployment modes.
+#
+# For Azure deployment:
+#   cd azure/
+#   cp terraform.tfvars.example terraform.tfvars
+#   # Edit terraform.tfvars with your Azure-specific values
+#   terraform init
+#   terraform apply
+#
+# For On-Premise deployment:
+#   cd onprem/
+#   cp terraform.tfvars.example terraform.tfvars
+#   # Edit terraform.tfvars with your on-premise-specific values
+#   terraform init
+#   terraform apply
+#
+# See README.md for detailed instructions.

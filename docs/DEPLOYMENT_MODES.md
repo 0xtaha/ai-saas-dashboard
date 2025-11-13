@@ -123,33 +123,36 @@ The application supports two deployment architectures:
 
 ### Option 1: Using Terraform (Recommended)
 
-#### 1. Configure Terraform Variables
+The Terraform configuration is now organized into separate directories for each deployment mode:
 
+```
+infra/terraform/
+├── shared/     # Common configurations
+├── azure/      # Azure-specific deployment
+└── onprem/     # On-premise deployment
+```
+
+#### Azure Deployment
+
+**1. Navigate to Azure directory:**
 ```bash
-cd infra/terraform
+cd infra/terraform/azure
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars`:
-
-**For Azure Mode:**
+**2. Edit `terraform.tfvars`:**
 ```hcl
-deployment_mode = "azure"
-project_name    = "ai-saas-dashboard"
-environment     = "prod"
-location        = "East US"
+project_name = "ai-saas-dashboard"
+environment  = "prod"
+location     = "East US"
+
+# Customize AKS, PostgreSQL, Redis settings as needed
+aks_node_count = 3
+postgres_sku_name = "GP_Standard_D4s_v3"
+redis_sku = "Premium"
 ```
 
-**For On-Premise Mode:**
-```hcl
-deployment_mode = "onprem"
-project_name    = "ai-saas-dashboard"
-environment     = "prod"
-location        = "East US"
-```
-
-#### 2. Initialize and Apply Terraform
-
+**3. Initialize and Apply:**
 ```bash
 terraform init
 terraform plan -out=tfplan
@@ -157,30 +160,72 @@ terraform apply tfplan
 ```
 
 Terraform will create:
-- AKS cluster
-- Azure Container Registry
+- AKS cluster with autoscaling
+- Azure Container Registry (Premium)
+- Azure PostgreSQL Flexible Server (zone-redundant)
+- Azure Cache for Redis (Premium)
+- Azure Blob Storage with lifecycle policies
 - Log Analytics & Application Insights
-- Virtual Network with subnets
-- **If Azure mode:** PostgreSQL Flexible Server, Redis Cache, Private Endpoints
-- Kubernetes namespaces and secrets
+- Virtual Network with private endpoints
+- Kubernetes namespaces
 
-#### 3. Get AKS Credentials
-
+**4. Get AKS Credentials:**
 ```bash
 az aks get-credentials \
   --resource-group $(terraform output -raw resource_group_name) \
   --name $(terraform output -raw aks_cluster_name)
 ```
 
-#### 4. Deploy Application
-
+**5. Deploy Application:**
 ```bash
-cd ../../scripts/deploy
-
-# For Azure mode
+cd ../../../scripts/deploy
 ./deploy-with-mode.sh azure
+```
 
-# For On-premise mode
+#### On-Premise Deployment
+
+**1. Navigate to on-premise directory:**
+```bash
+cd infra/terraform/onprem
+cp terraform.tfvars.example terraform.tfvars
+```
+
+**2. Edit `terraform.tfvars`:**
+```hcl
+project_name = "ai-saas-dashboard"
+environment  = "prod"
+location     = "on-premise"
+
+# Kubernetes configuration
+kubeconfig_path = "~/.kube/config"
+storage_class   = "local-path"  # or your storage provisioner
+
+# Container registry options
+registry_enabled = true
+registry_type    = "docker-registry"  # or "harbor"
+
+# Logging backend
+logging_backend = "loki"  # or "elasticsearch"
+```
+
+**3. Initialize and Apply:**
+```bash
+terraform init
+terraform plan -out=tfplan
+terraform apply tfplan
+```
+
+Terraform will create:
+- Kubernetes namespaces (app-backend, app-frontend, shared)
+- PostgreSQL StatefulSet with persistent volumes
+- Redis Deployment
+- Container registry (Docker Registry or Harbor)
+- Monitoring stack (Prometheus + Loki/ELK + Grafana)
+- Ingress configuration
+
+**4. Deploy Application:**
+```bash
+cd ../../../scripts/deploy
 ./deploy-with-mode.sh onprem
 ```
 

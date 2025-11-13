@@ -1,0 +1,53 @@
+# Azure Deployment - Example Terraform Variables
+# Copy this file to terraform.tfvars and update with your values
+
+# Project Configuration
+project_name = "ai-saas-dashboard"
+environment  = "prod"
+location     = "East US"
+
+# AKS Configuration
+aks_node_count     = 3
+aks_node_size      = "Standard_D4s_v3"
+aks_min_node_count = 2
+aks_max_node_count = 10
+
+# PostgreSQL Configuration
+postgres_sku_name              = "GP_Standard_D4s_v3"
+postgres_storage_mb            = 131072 # 128 GB
+postgres_version               = "15"
+postgres_admin_username        = "dbadmin"
+postgres_backup_retention_days = 7
+
+# Redis Configuration
+redis_sku      = "Premium"
+redis_family   = "P"
+redis_capacity = 1
+
+# Container Registry
+acr_sku = "Premium"
+
+# Monitoring
+log_analytics_retention_days = 30
+
+# Networking
+vnet_address_space             = ["10.0.0.0/16"]
+aks_subnet_address_prefix      = "10.0.1.0/24"
+postgres_subnet_address_prefix = "10.0.2.0/24"
+redis_subnet_address_prefix    = "10.0.3.0/24"
+
+# Storage Configuration
+storage_replication_type       = "GRS"
+enable_private_endpoints       = false
+blob_lifecycle_days_to_cool    = 30
+blob_lifecycle_days_to_archive = 90
+blob_lifecycle_days_to_delete  = 365
+
+# Tags
+tags = {
+  Project     = "AI SaaS Dashboard"
+  ManagedBy   = "Terraform"
+  Environment = "Production"
+  CostCenter  = "Engineering"
+  Deployment  = "Azure"
+}

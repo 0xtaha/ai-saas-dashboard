@@ -136,14 +136,26 @@ ai-saas-dashboard/
 │
 ├── infra/                          # Infrastructure as Code
 │   └── terraform/
-│       ├── main.tf                # Provider configuration
-│       ├── variables.tf           # Input variables
-│       ├── outputs.tf             # Output values
-│       ├── aks.tf                 # AKS cluster
-│       ├── postgres.tf            # Azure PostgreSQL
-│       ├── redis.tf               # Azure Redis
-│       ├── monitoring.tf          # Log Analytics, App Insights
-│       ├── networking.tf          # VNet, subnets, NSG
+│       ├── shared/                # Common configurations
+│       │   ├── variables.tf       # Shared variables
+│       │   └── outputs.tf         # Shared outputs
+│       ├── azure/                 # Azure deployment
+│       │   ├── main.tf            # Azure provider config
+│       │   ├── variables.tf       # Azure-specific variables
+│       │   ├── aks.tf             # AKS cluster
+│       │   ├── postgres.tf        # Azure PostgreSQL
+│       │   ├── redis.tf           # Azure Redis
+│       │   ├── monitoring.tf      # Log Analytics, App Insights
+│       │   └── networking.tf      # VNet, subnets, NSG
+│       ├── onprem/                # On-premise deployment
+│       │   ├── main.tf            # Kubernetes provider config
+│       │   ├── variables.tf       # On-premise variables
+│       │   ├── namespaces.tf      # Namespace resources
+│       │   ├── storage.tf         # Storage classes, PVCs
+│       │   ├── postgres.tf        # In-cluster PostgreSQL
+│       │   ├── redis.tf           # In-cluster Redis
+│       │   ├── registry.tf        # Container registry
+│       │   └── monitoring.tf      # Prometheus, Loki, Grafana
 │       └── README.md              # Terraform documentation
 │
 ├── .github/                        # GitHub Actions workflows

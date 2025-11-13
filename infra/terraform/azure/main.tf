@@ -1,3 +1,6 @@
+# Azure Deployment - Main Configuration
+# Deploys AI SaaS Dashboard with Azure managed services
+
 terraform {
   required_version = ">= 1.5.0"
 
@@ -25,7 +28,7 @@ terraform {
     # resource_group_name  = "tfstate-rg"
     # storage_account_name = "tfstatestorage"
     # container_name       = "tfstate"
-    # key                  = "ai-saas-dashboard.tfstate"
+    # key                  = "ai-saas-dashboard-azure.tfstate"
   }
 }
 
@@ -59,3 +62,13 @@ provider "helm" {
 
 # Data source for current Azure client config
 data "azurerm_client_config" "current" {}
+
+# Load shared configuration
+module "shared" {
+  source = "../shared"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  location      = var.location
+  tags          = var.tags
+}
