@@ -26,7 +26,7 @@ def create_app(config_name='development'):
         },
         'securityDefinitions': {
             'Bearer': {
-                'type': 'token',
+                'type': 'apiKey',
                 'name': 'Authorization',
                 'in': 'header',
                 'description': 'Enter your JWT token with "Bearer " prefix. Example: Bearer eyJhbGc...'
