@@ -6,10 +6,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: frontend
     ports:
       - "3000:80"
     environment:
-      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_API_URL=http://backend:5000/api
     depends_on:
       - backend
     networks:
@@ -20,6 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: backend
     ports:
       - "5000:5000"
     environment:
@@ -31,7 +33,7 @@ services:
       - AI_API_KEY=${AI_API_KEY}
       - STORAGE_TYPE=local
       - UPLOAD_FOLDER=/app/uploaded_files
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:80
+      - CORS_ORIGINS=*
     volumes:
       - uploaded_files:/app/uploaded_files
       - ./backend/logs:/app/logs

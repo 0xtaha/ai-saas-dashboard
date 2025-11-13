@@ -344,11 +344,6 @@ npm test
 npm run test:coverage
 ```
 
-### Integration Tests
-```bash
-docker-compose -f docker-compose.test.yml up --abort-on-container-exit
-```
-
 ## 🔐 Security Features
 
 - **Authentication:** JWT-based with secure token storage
