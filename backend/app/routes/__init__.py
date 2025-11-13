@@ -11,4 +11,4 @@ def register_blueprints(app):
     """Register all blueprints"""
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(files_bp, url_prefix='/api/files')
-    app.register_blueprint(health_bp, url_prefix='/api')
+    app.register_blueprint(health_bp)  # health_bp already has url_prefix='/api/health' in its definition

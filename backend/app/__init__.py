@@ -37,13 +37,7 @@ def create_app(config_name='development'):
         'specs_route': '/api/docs/'
     }
 
-    # Initialize extensions
-    db.init_app(app)
-    jwt.init_app(app)
-    migrate.init_app(app, db)
-    swagger.init_app(app)
-
-    # Initialize CORS with configuration
+    # Initialize CORS first (before other extensions that might add routes)
     cors.init_app(
         app,
         origins=app.config['CORS_ORIGINS'],
@@ -51,6 +45,12 @@ def create_app(config_name='development'):
         methods=app.config['CORS_METHODS'],
         supports_credentials=app.config['CORS_SUPPORTS_CREDENTIALS']
     )
+
+    # Initialize other extensions
+    db.init_app(app)
+    jwt.init_app(app)
+    migrate.init_app(app, db)
+    swagger.init_app(app)
 
     # Register blueprints
     from app.routes import register_blueprints
