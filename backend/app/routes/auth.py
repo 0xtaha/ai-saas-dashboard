@@ -147,7 +147,7 @@ def login():
 
         return success_response({
             'access_token': token,
-            'user': user.to_dict()
+            'user': user
         }, 'Login successful')
     except ValueError as e:
         return error_response(str(e), 401)
