@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { filesAPI } from '../services/api';
 import '../styles/FileList.css';
 
-const FileList = ({ refreshTrigger }) => {
+const FileList = ({ refreshTrigger, onFileSelect }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,12 +23,17 @@ const FileList = ({ refreshTrigger }) => {
 
     try {
       const response = await filesAPI.list(page, 20);
+      console.log('Files API response:', response);
       if (response.success) {
         setFiles(response.data.files || []);
         setPagination(response.data.pagination || pagination);
+      } else {
+        setError(response.message || 'Failed to load files');
       }
     } catch (err) {
-      setError('Failed to load files');
+      console.error('Error loading files:', err);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to load files';
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -86,7 +91,12 @@ const FileList = ({ refreshTrigger }) => {
         <>
           <div className="file-list">
             {files.map((file) => (
-              <div key={file.checksum} className="file-item">
+              <div
+                key={file.checksum}
+                className="file-item"
+                onClick={() => onFileSelect && onFileSelect(file)}
+                style={{ cursor: onFileSelect ? 'pointer' : 'default' }}
+              >
                 <div className="file-info">
                   <div className="file-icon">📄</div>
                   <div className="file-details">
@@ -101,12 +111,20 @@ const FileList = ({ refreshTrigger }) => {
                     <div className="file-checksum">
                       Checksum: {file.checksum.substring(0, 16)}...
                     </div>
+                    {file.processing_result && (
+                      <div className="file-result-preview">
+                        <small>✓ Analysis available - Click to view</small>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="file-actions">
                   {getStatusBadge(file.is_processed)}
                   <button
-                    onClick={() => handleDelete(file.checksum)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(file.checksum);
+                    }}
                     className="btn btn-danger btn-sm"
                   >
                     Delete

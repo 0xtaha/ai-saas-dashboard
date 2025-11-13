@@ -68,17 +68,9 @@ export const authAPI = {
 // Files API
 export const filesAPI = {
   upload: async (file, onProgress) => {
-    console.log('Uploading file:', file.name, 'Type:', file.type, 'Size:', file.size);
-
     const formData = new FormData();
     // Append file - the File object already contains the MIME type
     formData.append('file', file, file.name);
-
-    // Log FormData contents for debugging
-    console.log('FormData entries:');
-    for (let pair of formData.entries()) {
-      console.log(pair[0], pair[1]);
-    }
 
     // Don't set Content-Type header manually - let axios set it with the boundary
     const response = await api.post('/files/upload', formData, {

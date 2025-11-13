@@ -4,20 +4,6 @@ import '../styles/ProcessingResults.css';
 const ProcessingResults = ({ data }) => {
   const { file, ai_processing } = data;
 
-  // Mock data for demonstration when backend isn't fully connected
-  const mockResults = {
-    summary: "This is a mock summary of the processed file. The AI has analyzed the content and extracted key information.",
-    keywords: ["document", "analysis", "AI", "processing", "data"],
-    sentiment: "Neutral",
-    entities: [
-      { type: "Person", value: "John Doe" },
-      { type: "Organization", value: "AI Corp" },
-      { type: "Date", value: "2024-01-15" }
-    ],
-    textLength: 1250,
-    language: "English"
-  };
-
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
@@ -85,59 +71,26 @@ const ProcessingResults = ({ data }) => {
 
             {file.processing_result ? (
               <div className="actual-results">
-                <pre>{file.processing_result}</pre>
+                <div className="result-box">
+                  <h5>AI Processing Result</h5>
+                  <div className="result-text">
+                    {typeof file.processing_result === 'string' ? (
+                      <p>{file.processing_result}</p>
+                    ) : (
+                      <pre>{JSON.stringify(file.processing_result, null, 2)}</pre>
+                    )}
+                  </div>
+                </div>
+                {file.processed_at && (
+                  <div className="processed-time">
+                    <small>Processed at: {new Date(file.processed_at).toLocaleString()}</small>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="mock-results">
-                <div className="results-section">
-                  <h5>Summary</h5>
-                  <p>{mockResults.summary}</p>
-                </div>
-
-                <div className="results-section">
-                  <h5>Key Statistics</h5>
-                  <div className="stats-grid">
-                    <div className="stat-item">
-                      <span className="stat-label">Text Length</span>
-                      <span className="stat-value">{mockResults.textLength} chars</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">Language</span>
-                      <span className="stat-value">{mockResults.language}</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">Sentiment</span>
-                      <span className="stat-value">{mockResults.sentiment}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="results-section">
-                  <h5>Keywords</h5>
-                  <div className="keywords">
-                    {mockResults.keywords.map((keyword, index) => (
-                      <span key={index} className="keyword-badge">
-                        {keyword}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="results-section">
-                  <h5>Detected Entities</h5>
-                  <div className="entities">
-                    {mockResults.entities.map((entity, index) => (
-                      <div key={index} className="entity-item">
-                        <span className="entity-type">{entity.type}:</span>
-                        <span className="entity-value">{entity.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mock-notice">
-                  <p>ℹ️ These are mock results for demonstration. Connect to the AI backend to see real processing results.</p>
-                </div>
+              <div className="no-results">
+                <p>⏳ File is queued for processing. Results will appear here once processing is complete.</p>
+                <p className="help-text">The AI service is analyzing your file. This may take a few moments.</p>
               </div>
             )}
           </div>
