@@ -15,7 +15,10 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     // Set Content-Type to application/json for non-FormData requests
-    if (!(config.data instanceof FormData)) {
+    // For FormData, delete Content-Type to let browser set it with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    } else {
       config.headers['Content-Type'] = 'application/json';
     }
     return config;
