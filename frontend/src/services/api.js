@@ -67,12 +67,10 @@ export const filesAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
+    // Don't set Content-Type header manually - let axios set it with the boundary
     const response = await api.post('/files/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
       onUploadProgress: (progressEvent) => {
-        if (onProgress) {
+        if (onProgress && progressEvent.total) {
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
