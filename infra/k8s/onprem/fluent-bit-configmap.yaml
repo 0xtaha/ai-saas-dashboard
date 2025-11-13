@@ -1,0 +1,150 @@
+# Fluent Bit Configuration for On-Premise Deployment
+# Replaces Azure Log Analytics with on-premise logging solutions
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: shared
+  labels:
+    app: fluent-bit
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Daemon Off
+        Flush 1
+        Log_Level info
+        Parsers_File parsers.conf
+        Parsers_File custom_parsers.conf
+        HTTP_Server On
+        HTTP_Listen 0.0.0.0
+        HTTP_Port 2020
+        Health_Check On
+
+    [INPUT]
+        Name tail
+        Path /var/log/containers/*.log
+        multiline.parser docker, cri
+        Tag kube.*
+        Mem_Buf_Limit 5MB
+        Skip_Long_Lines On
+
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Kube_URL https://kubernetes.default.svc:443
+        Kube_CA_File /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix kube.var.log.containers.
+        Merge_Log On
+        Keep_Log Off
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude On
+        Labels On
+        Annotations Off
+
+    [FILTER]
+        Name modify
+        Match kube.*
+        Add cluster_name ai-saas-onprem
+        Add environment production
+
+    [FILTER]
+        Name grep
+        Match kube.*
+        Regex $kubernetes['namespace_name'] ^(app-backend|app-frontend|shared)$
+
+    # Option 1: Output to Elasticsearch (Recommended for production)
+    [OUTPUT]
+        Name es
+        Match kube.*
+        Host elasticsearch.shared.svc.cluster.local
+        Port 9200
+        Logstash_Format On
+        Logstash_Prefix kubernetes
+        Retry_Limit False
+        Type _doc
+        # Uncomment if using authentication:
+        # HTTP_User admin
+        # HTTP_Passwd ${ES_PASSWORD}
+        # tls On
+        # tls.verify Off
+
+    # Option 2: Output to Loki (Lightweight alternative)
+    # [OUTPUT]
+    #     Name loki
+    #     Match kube.*
+    #     Host loki.shared.svc.cluster.local
+    #     Port 3100
+    #     Labels job=fluentbit, cluster=ai-saas-onprem
+    #     Auto_Kubernetes_Labels on
+
+    # Option 3: Output to Grafana Cloud Loki (Hybrid approach)
+    # [OUTPUT]
+    #     Name loki
+    #     Match kube.*
+    #     Host logs-prod-us-central1.grafana.net
+    #     Port 443
+    #     tls on
+    #     tls.verify on
+    #     http_User ${LOKI_USER}
+    #     http_Passwd ${LOKI_API_KEY}
+    #     Labels job=fluentbit, cluster=ai-saas-onprem
+
+    # Option 4: Output to File (Simple, for development)
+    # [OUTPUT]
+    #     Name file
+    #     Match kube.*
+    #     Path /var/log/fluentbit
+    #     Format json_lines
+
+    # Always output to stdout for kubectl logs
+    [OUTPUT]
+        Name stdout
+        Match kube.*
+        Format json_lines
+
+  parsers.conf: |
+    [PARSER]
+        Name docker
+        Format json
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name syslog
+        Format regex
+        Regex ^\<(?<pri>[0-9]+)\>(?<time>[^ ]* {1,2}[^ ]* [^ ]*) (?<host>[^ ]*) (?<ident>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<pid>[0-9]+)\])?(?:[^\:]*\:)? *(?<message>.*)$
+        Time_Key time
+        Time_Format %b %d %H:%M:%S
+
+  custom_parsers.conf: |
+    [PARSER]
+        Name flask
+        Format regex
+        Regex ^\[(?<time>[^\]]*)\] (?<level>[A-Z]+) in (?<module>[^:]+): (?<message>.*)$
+        Time_Key time
+        Time_Format %Y-%m-%d %H:%M:%S,%L
+
+---
+# Logging Stack Comparison:
+#
+# Option 1: ELK Stack (Elasticsearch + Logstash + Kibana)
+#   Pros: Full-featured, powerful search, mature
+#   Cons: Resource-intensive, complex setup
+#   Best for: Large deployments (50+ pods)
+#
+# Option 2: PLG Stack (Prometheus + Loki + Grafana)
+#   Pros: Lightweight, simple, integrated with Prometheus
+#   Cons: Limited query capabilities vs Elasticsearch
+#   Best for: Small-medium deployments (10-50 pods)
+#
+# Option 3: Grafana Cloud Loki
+#   Pros: Managed, no maintenance, generous free tier
+#   Cons: Data leaves premises, costs for large volume
+#   Best for: Hybrid deployments, small teams
+#
+# Option 4: File-based logging
+#   Pros: Simple, no extra components
+#   Cons: No search, hard to manage at scale
+#   Best for: Development only

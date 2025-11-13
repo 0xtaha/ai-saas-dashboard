@@ -9,7 +9,8 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: managed-premium
+  # For on-premise: Use 'standard' (default), 'local-path', or your cluster's storage class
+  # storageClassName: standard
 ---
 apiVersion: apps/v1
 kind: Deployment

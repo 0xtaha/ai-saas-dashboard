@@ -29,13 +29,16 @@ A production-ready, enterprise-grade AI-powered file processing platform with mu
 - **Azure Log Analytics** - Centralized logging and monitoring
 - **Cost:** ~$1,140/month + storage costs
 
-#### On-Premise Mode
-- **k8 (AKS)** - Container orchestration
-- **PostgreSQL on k8** - Self-hosted database with persistent volumes
-- **Redis on k8** - Self-hosted cache
-- **Persistent Volume Claims (PVC)** - File storage using Azure Files
-- **docker registry** - Private container registry
-- **fluent-bit/prometheus** - Centralized logging and monitoring
+#### Pure On-Premise Mode (Zero Azure Dependencies)
+- **Any Kubernetes** - K3s, RKE2, kubeadm, or any K8s distribution
+- **PostgreSQL in-cluster** - Self-hosted database with persistent volumes
+- **Redis in-cluster** - Self-hosted cache
+- **Flexible Storage** - Local-path, NFS, Longhorn, Ceph/Rook, or any storage provisioner
+- **Harbor/Docker Registry** - On-premise container registry with scanning
+- **Loki/ELK Stack** - On-premise logging (no cloud dependencies)
+- **Prometheus + Grafana** - Full observability stack
+- **Cost:** ~$490/month (infrastructure) or one-time hardware cost
+- **Data Sovereignty**: Complete control, air-gap capable
 
 ### Tech Stack
 
@@ -242,6 +245,8 @@ Access the application:
 
 ### Deployment & Operations
 - **[Branching Strategy](BRANCHING_STRATEGY.md)** - Complete branching workflow and CI/CD integration guide
+- **[On-Premise Deployment](docs/ONPREMISE_DEPLOYMENT.md)** - 🆕 Complete guide for pure on-premise deployment (zero Azure dependencies)
+- **[On-Premise Migration Summary](ONPREMISE_MIGRATION_SUMMARY.md)** - 🆕 Quick reference for on-premise setup
 - **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - Detailed comparison of Azure vs On-Premise modes
 - **[Release Process](docs/RELEASE_PROCESS.md)** - Git tagging strategy and deployment workflow
 - **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Migrating between deployment modes

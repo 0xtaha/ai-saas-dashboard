@@ -1,0 +1,256 @@
+# On-Premise Container Registry Options
+# This file provides configurations for various on-premise container registries
+
+---
+# Option 1: Harbor Registry (Recommended for Production)
+# Harbor is an open-source trusted cloud native registry project
+# Features: Replication, vulnerability scanning, RBAC, webhooks
+# Install: https://goharbor.io/docs/latest/install-config/
+
+# Docker Registry Secret for Harbor
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-registry-secret
+  namespace: app-backend
+type: kubernetes.io/dockerconfigjson
+data:
+  # Create with: kubectl create secret docker-registry harbor-registry-secret \
+  #   --docker-server=harbor.example.com \
+  #   --docker-username=admin \
+  #   --docker-password=Harbor12345 \
+  #   --docker-email=admin@example.com \
+  #   --namespace=app-backend
+  .dockerconfigjson: e30K  # Placeholder - replace with actual credentials
+
+---
+# Option 2: Docker Registry (Simple, for development)
+# Basic Docker registry without advanced features
+# Deploy in cluster:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-registry
+  namespace: shared
+  labels:
+    app: docker-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-registry
+  template:
+    metadata:
+      labels:
+        app: docker-registry
+    spec:
+      containers:
+      - name: registry
+        image: registry:2
+        ports:
+        - containerPort: 5000
+          name: registry
+        env:
+        - name: REGISTRY_STORAGE_DELETE_ENABLED
+          value: "true"
+        volumeMounts:
+        - name: registry-storage
+          mountPath: /var/lib/registry
+        - name: registry-config
+          mountPath: /etc/docker/registry
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: registry-storage
+        persistentVolumeClaim:
+          claimName: registry-pvc
+      - name: registry-config
+        configMap:
+          name: registry-config
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-pvc
+  namespace: shared
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docker-registry
+  namespace: shared
+spec:
+  selector:
+    app: docker-registry
+  ports:
+  - port: 5000
+    targetPort: 5000
+    name: registry
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: shared
+data:
+  config.yml: |
+    version: 0.1
+    log:
+      level: info
+    storage:
+      cache:
+        blobdescriptor: inmemory
+      filesystem:
+        rootdirectory: /var/lib/registry
+      delete:
+        enabled: true
+    http:
+      addr: :5000
+      headers:
+        X-Content-Type-Options: [nosniff]
+    health:
+      storagedriver:
+        enabled: true
+        interval: 10s
+        threshold: 3
+
+---
+# Ingress for Registry (with TLS)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: registry-ingress
+  namespace: shared
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"  # Unlimited upload size
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using cert-manager
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - registry.yourdomain.com
+    secretName: registry-tls
+  rules:
+  - host: registry.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: docker-registry
+            port:
+              number: 5000
+
+---
+# Option 3: Nexus Repository OSS
+# Multi-format repository manager (Docker, npm, Maven, etc.)
+# More resource-intensive but feature-rich
+# Deploy: https://github.com/sonatype/nexus-public
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nexus-registry-secret
+  namespace: app-backend
+type: kubernetes.io/dockerconfigjson
+data:
+  # Create with: kubectl create secret docker-registry nexus-registry-secret \
+  #   --docker-server=nexus.example.com:5000 \
+  #   --docker-username=admin \
+  #   --docker-password=admin123 \
+  #   --namespace=app-backend
+  .dockerconfigjson: e30K  # Placeholder
+
+---
+# Option 4: GitLab Container Registry
+# If you're using GitLab for source control
+# Integrated with GitLab CI/CD
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitlab-registry-secret
+  namespace: app-backend
+type: kubernetes.io/dockerconfigjson
+data:
+  # Create with: kubectl create secret docker-registry gitlab-registry-secret \
+  #   --docker-server=registry.gitlab.com \
+  #   --docker-username=<gitlab-username> \
+  #   --docker-password=<access-token> \
+  #   --namespace=app-backend
+  .dockerconfigjson: e30K  # Placeholder
+
+---
+# ImagePullSecrets Patch
+# Apply to service accounts to enable pulling from private registries
+
+# Backend namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: app-backend
+imagePullSecrets:
+- name: harbor-registry-secret
+# OR: name: nexus-registry-secret
+# OR: name: gitlab-registry-secret
+
+---
+# Frontend namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: app-frontend
+imagePullSecrets:
+- name: harbor-registry-secret
+
+---
+# Shared namespace (for registry itself)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: shared
+imagePullSecrets:
+- name: harbor-registry-secret
+
+---
+# Registry Recommendations:
+#
+# Small Team (1-5 developers):
+#   - Docker Registry (simple, in-cluster)
+#   - GitLab Registry (if using GitLab)
+#
+# Medium Team (5-20 developers):
+#   - Harbor (recommended)
+#   - Nexus OSS
+#
+# Large Team/Enterprise (20+ developers):
+#   - Harbor with HA setup
+#   - Commercial solutions (JFrog Artifactory, etc.)
+#
+# For GitHub Actions CI/CD with on-premise:
+#   1. Use Harbor or Nexus
+#   2. Expose via HTTPS (required for Docker)
+#   3. Configure secrets in GitHub Actions
+#   4. Update CD workflow to push to on-prem registry

@@ -41,7 +41,7 @@ graph TB
         B -->|Push to dev| N[Wait for CI]
         K --> N
         N --> O[Build Docker Images]
-        O --> P[Tag: dev-{hash}]
+        O --> P["Tag: dev-hash"]
         P --> Q[Push to ACR]
         Q --> R[Security Scan Images]
         R --> S[Deploy to Dev Environment]
