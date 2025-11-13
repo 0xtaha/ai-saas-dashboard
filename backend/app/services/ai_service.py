@@ -144,7 +144,7 @@ class AIService:
             #     timeout=60
             # )
             # response.raise_for_status()
-            # return response.json()
+            return response
         except requests.exceptions.RequestException as e:
             return {
                 'success': False,
