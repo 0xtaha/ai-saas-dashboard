@@ -27,7 +27,8 @@ const Dashboard = () => {
     try {
       // Fetch processing status for the selected file
       const response = await filesAPI.getProcessingStatus(file.checksum);
-      if (response.success) {
+      // Backend returns { status: "success", data: {...}, message: "..." }
+      if (response.status === 'success') {
         setSelectedFile({
           file: {
             ...file,

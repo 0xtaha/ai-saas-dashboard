@@ -53,7 +53,8 @@ const FileUpload = ({ onUploadSuccess }) => {
         (progress) => setUploadProgress(progress)
       );
 
-      if (response.success) {
+      // Backend returns { status: "success", data: {...}, message: "..." }
+      if (response.status === 'success') {
         setSuccess('File uploaded successfully!');
         setSelectedFile(null);
         setUploadProgress(0);

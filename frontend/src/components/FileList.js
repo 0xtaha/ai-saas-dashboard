@@ -25,12 +25,13 @@ const FileList = ({ refreshTrigger, onFileSelect }) => {
       const response = await filesAPI.list(page, 20);
       console.log('=== FILES API DEBUG ===');
       console.log('Full response:', JSON.stringify(response, null, 2));
-      console.log('response.success:', response.success);
+      console.log('response.status:', response.status);
       console.log('response.data:', response.data);
       console.log('response.data.files:', response.data?.files);
       console.log('Files array length:', response.data?.files?.length);
 
-      if (response.success) {
+      // Backend returns { status: "success", data: {...}, message: "..." }
+      if (response.status === 'success') {
         const filesList = response.data.files || [];
         console.log('Setting files to state:', filesList);
         console.log('Number of files:', filesList.length);
