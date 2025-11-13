@@ -248,6 +248,7 @@ Access the application:
 - **[Docker Development Guide](docs/DOCKER_GUIDE.md)** - Local development with Docker Compose
 
 ### Deployment & Operations
+- **[Branching Strategy](BRANCHING_STRATEGY.md)** - Complete branching workflow and CI/CD integration guide
 - **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - Detailed comparison of Azure vs On-Premise modes
 - **[Release Process](docs/RELEASE_PROCESS.md)** - Git tagging strategy and deployment workflow
 - **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Migrating between deployment modes

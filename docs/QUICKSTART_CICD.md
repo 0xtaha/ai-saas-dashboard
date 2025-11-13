@@ -191,7 +191,8 @@ kubectl cp <pod-name>:/path/to/file ./local-file -n ai-saas-dashboard
 ### Development Flow
 
 ```bash
-# 1. Create feature branch
+# 1. Create feature branch from dev
+git checkout dev
 git checkout -b feature/new-feature
 
 # 2. Make changes and commit
@@ -199,22 +200,29 @@ git add .
 git commit -m "Add new feature"
 git push origin feature/new-feature
 
-# 3. Create Pull Request
-# → GitHub Actions runs CI tests
+# 3. Create Pull Request to dev branch
+# → GitHub Actions runs CI tests (must pass before merge)
 
-# 4. Merge to main
-# → GitHub Actions automatically deploys to AKS
+# 4. Merge to dev
+# → CI runs, then CD automatically deploys to dev environment
 ```
 
 ### Deployment Triggers
 
 | Action | Trigger | Environment | Replicas |
 |--------|---------|-------------|----------|
-| Pull Request | CI tests only | N/A | N/A |
-| Push to develop | CI tests only | N/A | N/A |
-| Push to main | CI + Deploy | Staging | 2-3 |
-| Release tag (v1.0.0) | CI + Deploy | Production | 3-10 |
+| Pull Request to dev/staging/main | CI tests only | N/A | N/A |
+| Push to dev | CI + Auto-Deploy | Dev | 1 |
+| Push to staging (no tag) | CI tests only | N/A | N/A |
+| Push to main (no tag) | CI tests only | N/A | N/A |
+| Tag on staging (v*-rc.*) | CI + Deploy | Staging | 2-3 |
+| Tag on main (v*) | CI + Deploy | Production | 3-10 |
 | Manual dispatch | CI + Deploy | Selected | Custom |
+
+**Important:**
+- Dev auto-deploys on every push (after CI passes)
+- Staging and main require git tags for deployment
+- CI must pass before CD will deploy
 
 ## 🛠️ Troubleshooting
 

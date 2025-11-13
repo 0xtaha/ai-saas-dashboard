@@ -90,8 +90,8 @@ The CI/CD pipeline automates the entire process from code commit to production d
 ### 1. Continuous Integration (CI)
 
 **Triggers:**
-- Pull requests to `main` or `develop` branches
-- Commits to `develop` branch
+- Pull requests to `main`, `staging`, or `dev` branches
+- Commits to `dev` or `staging` branches
 
 **Process:**
 ```
@@ -375,8 +375,9 @@ az acr credential show --name aisaasacr --query passwords[0].value -o tsv
    - Uploads results to GitHub Security
 
 **When it runs:**
-- On every pull request
-- On commits to `develop` branch
+- On pull requests to `main`, `staging`, or `dev` branches
+- On commits to `dev` or `staging` branches
+- **CI must pass before CD will deploy**
 
 ### CD Workflow (`.github/workflows/cd.yml`)
 
@@ -409,9 +410,15 @@ az acr credential show --name aisaasacr --query passwords[0].value -o tsv
    - Verifies rollback status
 
 **When it runs:**
+- After CI completes successfully (workflow_run trigger)
 - On push to `dev` branch (auto-deploy)
 - On tag push to `staging` or `main` branches (v1.0.0-rc.1, v1.0.0, etc.)
 - Manual trigger with environment selection
+
+**CI Dependency:**
+- CD workflow waits for CI to complete before starting
+- If CI fails, CD will not run
+- This ensures only tested code is deployed
 
 ### Deployment Environments
 

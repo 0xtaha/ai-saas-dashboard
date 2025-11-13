@@ -1,6 +1,11 @@
 name: CD - Deploy to Azure AKS
 
 on:
+  workflow_run:
+    workflows: ["CI - Build and Test"]
+    types:
+      - completed
+    branches: [dev, staging, main]
   push:
     branches:
       - dev  # Auto-deploy dev on every push (no tag required)
@@ -39,6 +44,15 @@ jobs:
       branch: ${{ steps.determine-env.outputs.branch }}
       should_deploy: ${{ steps.determine-env.outputs.should_deploy }}
     steps:
+      - name: Check CI Status
+        if: github.event_name == 'workflow_run'
+        run: |
+          if [[ "${{ github.event.workflow_run.conclusion }}" != "success" ]]; then
+            echo "❌ CI workflow did not succeed. Skipping deployment."
+            exit 1
+          fi
+          echo "✅ CI workflow succeeded. Proceeding with deployment."
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -266,6 +280,7 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
           # Monitoring basic auth
+          apt-get update && apt-get install -y apache2-utils
           echo "${{ secrets.MONITORING_PASSWORD }}" | htpasswd -ci auth admin
           kubectl create secret generic monitoring-basic-auth \
             --from-file=auth \
@@ -317,7 +332,7 @@ jobs:
           kubectl apply -f infra/k8s/monitoring/prometheus/
 
           # Apply ingress if production
-          if [[ "${{ env.DEPLOY_ENV }}" == "prod" ]]; then
+          if [[ "${{ env.DEPLOY_ENV }}" == "main" ]]; then
             echo "🌐 Deploying ingress..."
             kubectl apply -f infra/k8s/base/ingress.yaml
           fi
