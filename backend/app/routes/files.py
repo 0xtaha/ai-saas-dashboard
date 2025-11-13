@@ -64,13 +64,13 @@ def upload_file():
         description: Unauthorized - missing or invalid token
     """
     user_id = int(get_jwt_identity())  # Convert string ID to integer
-
+    print(user_id)
     # Check if file is in request
     if 'file' not in request.files:
         return error_response("No file part in request", 400)
 
     file = request.files['file']
-
+    print(file)
     # Save file using FileService
     success, message, file_record = FileService.save_file(file, user_id)
 
