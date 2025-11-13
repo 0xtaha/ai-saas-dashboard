@@ -5,9 +5,6 @@ const API_URL = process.env.REACT_APP_API_URL;
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Add token to requests if it exists
@@ -16,6 +13,10 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Set Content-Type to application/json for non-FormData requests
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
     }
     return config;
   },
@@ -64,8 +65,17 @@ export const authAPI = {
 // Files API
 export const filesAPI = {
   upload: async (file, onProgress) => {
+    console.log('Uploading file:', file.name, 'Type:', file.type, 'Size:', file.size);
+
     const formData = new FormData();
-    formData.append('file', file);
+    // Append file - the File object already contains the MIME type
+    formData.append('file', file, file.name);
+
+    // Log FormData contents for debugging
+    console.log('FormData entries:');
+    for (let pair of formData.entries()) {
+      console.log(pair[0], pair[1]);
+    }
 
     // Don't set Content-Type header manually - let axios set it with the boundary
     const response = await api.post('/files/upload', formData, {
