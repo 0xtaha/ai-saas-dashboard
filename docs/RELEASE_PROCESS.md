@@ -1,14 +1,20 @@
 # Release Process and Tagging Strategy
 
-This document explains how to create releases and deploy to different environments using git tags.
+This document explains how to create releases and deploy to different environments using git tags and branch pushes.
 
 ## Overview
 
-The CI/CD pipeline is configured to deploy **only when a version tag is pushed** to one of the three main branches:
+The CI/CD pipeline deployment strategy:
 
-- `dev` → deploys to **dev** environment
-- `staging` → deploys to **staging** environment
-- `main` → deploys to **prod** environment
+- **`dev` branch** → Deploys to **dev** environment on **every push** (no tag required)
+- **`staging` branch** → Deploys to **staging** environment on **tag push only**
+- **`main` branch** → Deploys to **main** environment on **tag push only**
+
+### Image Tagging Strategy
+
+- **Dev images**: Tagged with commit hash (e.g., `dev-a1b2c3d4`)
+- **Staging/Main images**: Tagged with git tag (e.g., `v1.0.0-rc.1`, `v1.0.0`)
+- **Latest tag**: Only applied to staging and main images, not dev
 
 ## Branch Strategy
 
@@ -20,28 +26,25 @@ The CI/CD pipeline is configured to deploy **only when a version tag is pushed**
 │  dev branch          staging branch        main branch     │
 │  (Development)       (Pre-production)      (Production)    │
 │       │                   │                     │          │
-│       │ v1.0.0-dev.1      │                     │          │
-│       ├─────────────→     │                     │          │
+│  Push commit              │                     │          │
+│  Auto-deploy ✓            │                     │          │
+│  Image: dev-abc123        │                     │          │
+│       │                   │                     │          │
 │       │                   │ v1.0.0-rc.1         │          │
-│       │                   ├──────────────→      │          │
+│       ├─────────────→     │ (tag required)      │          │
+│       │                   │ Image: v1.0.0-rc.1  │          │
 │       │                   │                     │ v1.0.0   │
-│       │                   │                     ├──────→   │
-│       │                   │                     │  Deploy  │
-│       │                   │                     │   to     │
-│       │                   │                     │  PROD    │
+│       │                   ├──────────────→      │ (tag req)│
+│       │                   │                     │ Image:   │
+│       │                   │                     │ v1.0.0   │
 │       ▼                   ▼                     ▼          │
-│    Deploy to           Deploy to            Deploy to     │
-│      DEV               STAGING                PROD        │
+│    Deploy on           Deploy on            Deploy on     │
+│   Every Push         Tag Push Only        Tag Push Only   │
+│      DEV               STAGING                MAIN         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## Tag Naming Convention
-
-### Development Tags (dev branch)
-```
-v<major>.<minor>.<patch>-dev.<number>
-```
-Examples: `v1.0.0-dev.1`, `v1.2.0-dev.5`
 
 ### Staging Tags (staging branch)
 ```
@@ -55,9 +58,33 @@ v<major>.<minor>.<patch>
 ```
 Examples: `v1.0.0`, `v1.2.0`, `v2.0.0`
 
+**Note**: Dev branch does not require tags. Images are automatically tagged with commit hashes.
+
+## What Triggers Deployment?
+
+| Branch | Trigger | Image Tag | Example |
+|--------|---------|-----------|---------|
+| **dev** | Every push to branch | `dev-<commit-hash>` | `dev-a1b2c3d4` |
+| **staging** | Tag push only | `<git-tag>` + `latest` | `v1.0.0-rc.1` |
+| **main** | Tag push only | `<git-tag>` + `latest` | `v1.0.0` |
+
+### What Does NOT Trigger Deployment
+
+❌ Pushing commits to `staging` branch without a tag
+❌ Pushing commits to `main` branch without a tag
+❌ Creating a tag on `dev` branch
+❌ Creating branches
+❌ Opening/merging pull requests
+
+✅ **Deployment Only Happens When**:
+- Push to `dev` branch (automatic, no tag needed)
+- Push a `v*` tag to `staging` or `main` branch
+
 ## Release Workflow
 
-### 1. Development Release (dev environment)
+### 1. Development Deployment (dev environment)
+
+**No tags required** - Just push to dev branch:
 
 ```bash
 # Switch to dev branch
@@ -67,71 +94,130 @@ git checkout dev
 git add .
 git commit -m "feat: add new feature"
 
-# Create a development tag
-git tag v1.0.0-dev.1
-
-# Push the tag (this triggers deployment to dev)
-git push origin v1.0.0-dev.1
-
-# Push the branch
+# Push the branch (this automatically triggers deployment)
 git push origin dev
 ```
 
+**Result**:
+- Image built and tagged as `dev-<commit-hash>` (e.g., `dev-a1b2c3d4`)
+- Automatically deployed to dev environment
+- No "latest" tag applied
+
 ### 2. Staging Release (staging environment)
+
+**Tags required** - Create and push a tag:
 
 ```bash
 # Merge dev to staging
 git checkout staging
 git merge dev
 
+# Push the branch first
+git push origin staging
+
 # Create a release candidate tag
 git tag v1.0.0-rc.1
 
 # Push the tag (this triggers deployment to staging)
 git push origin v1.0.0-rc.1
-
-# Push the branch
-git push origin staging
 ```
 
-### 3. Production Release (prod environment)
+**Result**:
+- Image built and tagged as `v1.0.0-rc.1` and `latest`
+- Deployed to staging environment
+
+### 3. Production Release (main environment)
+
+**Tags required** - Create and push a tag:
 
 ```bash
 # Merge staging to main
 git checkout main
 git merge staging
 
+# Push the branch first
+git push origin main
+
 # Create a production tag
 git tag v1.0.0
 
-# Push the tag (this triggers deployment to prod)
+# Push the tag (this triggers deployment to main)
 git push origin v1.0.0
-
-# Push the branch
-git push origin main
 ```
+
+**Result**:
+- Image built and tagged as `v1.0.0` and `latest`
+- Deployed to main (production) environment
 
 ## Automated Deployment Process
 
-When you push a tag to one of the three main branches, the CI/CD pipeline:
+### Dev Branch (Push-based)
 
-1. **Checks the branch** - Validates the tag is on `dev`, `staging`, or `main`
-2. **Determines environment** - Maps branch to environment (dev/staging/prod)
-3. **Builds images** - Builds and pushes Docker images with the tag version
+When you push to the `dev` branch, the CI/CD pipeline:
+
+1. **Detects dev push** - Recognizes commit to dev branch
+2. **Determines environment** - Sets environment to dev
+3. **Builds images** - Tags images with commit hash (e.g., `dev-a1b2c3d4`)
+4. **Scans for vulnerabilities** - Runs Trivy security scans
+5. **Deploys to AKS** - Deploys to dev environment
+6. **Verifies deployment** - Waits for rollout completion
+7. **Sends notification** - Sends Slack notification (if configured)
+
+### Staging/Main Branches (Tag-based)
+
+When you push a tag to `staging` or `main` branch, the CI/CD pipeline:
+
+1. **Checks the branch** - Validates the tag is on `staging` or `main`
+2. **Determines environment** - Maps branch to environment (staging/main)
+3. **Builds images** - Tags images with git tag (e.g., `v1.0.0`) plus `latest`
 4. **Scans for vulnerabilities** - Runs Trivy security scans
 5. **Deploys to AKS** - Deploys to the appropriate environment
 6. **Verifies deployment** - Waits for rollout completion
 7. **Sends notification** - Sends Slack notification (if configured)
 
-### Deployment Flow Diagram
+### Deployment Flow Diagrams
 
+**Dev Branch (Auto-deploy on push)**:
+```
+Push to dev branch
+       │
+       ▼
+┌─────────────────┐
+│  Detect Push    │ ◄── Recognizes dev branch commit
+│  to Dev Branch  │
+└────────┬────────┘
+         │ ✅ Dev push detected
+         ▼
+┌─────────────────┐
+│ Build & Push    │ ◄── Builds Docker images
+│ Docker Images   │     Tags: dev-abc1234 (no latest)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Security Scan   │ ◄── Trivy vulnerability scan
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Deploy to AKS   │ ◄── Deploy to dev environment
+│  Dev Env        │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Verify & Notify │ ◄── Check rollout status
+└─────────────────┘     Send Slack notification
+```
+
+**Staging/Main Branches (Tag-based)**:
 ```
 Tag Push (v1.0.0)
        │
        ▼
 ┌─────────────────┐
 │  Check Branch   │ ◄── Validates tag is on allowed branch
-│  & Environment  │     (dev, staging, main)
+│  & Environment  │     (staging or main)
 └────────┬────────┘
          │ ✅ Valid
          ▼
@@ -148,7 +234,7 @@ Tag Push (v1.0.0)
          ▼
 ┌─────────────────┐
 │ Deploy to AKS   │ ◄── Deploy to appropriate environment
-│  Environment    │     (dev/staging/prod)
+│  Environment    │     (staging or main)
 └────────┬────────┘
          │
          ▼
@@ -165,7 +251,7 @@ You can also manually trigger a deployment from GitHub Actions:
 2. Select **CD - Deploy to Azure AKS**
 3. Click **Run workflow**
 4. Choose:
-   - **Environment**: dev, staging, or prod
+   - **Environment**: dev, staging, or main
    - **Deployment Mode**: azure or onprem
 5. Click **Run workflow**
 
@@ -260,7 +346,7 @@ git push origin staging
 
 git checkout dev
 git merge staging
-git push origin dev
+git push origin dev  # This auto-deploys to dev
 
 # Delete hotfix branch
 git branch -d hotfix/critical-bug
@@ -318,12 +404,22 @@ AZURE_STORAGE_CONNECTION_STRING
 
 ## Troubleshooting
 
-### Tag is not triggering deployment
+### Dev deployment not triggering
+
+**Check 1: Did you push to dev branch?**
+```bash
+git push origin dev
+```
+
+**Check 2: Check GitHub Actions**
+Navigate to Actions tab and look for workflow runs triggered by push to dev
+
+### Tag is not triggering deployment (staging/main)
 
 **Check 1: Is the tag on an allowed branch?**
 ```bash
 git branch -r --contains v1.0.0
-# Should show: origin/main, origin/staging, or origin/dev
+# Should show: origin/main or origin/staging (not origin/dev)
 ```
 
 **Check 2: Did you push the tag?**
@@ -349,16 +445,16 @@ Navigate to Actions tab and look for workflow runs
 
 ### Wrong environment deployed
 
-The environment is determined by which branch the tag is on:
-- Tags on `main` → prod
-- Tags on `staging` → staging
-- Tags on `dev` → dev
+The environment is determined by:
+- Push to `dev` branch → dev environment (no tag needed)
+- Tags on `staging` branch → staging environment
+- Tags on `main` branch → main environment
 
-If a tag exists on multiple branches, the pipeline uses this priority: main > staging > dev
+If a tag exists on multiple branches, the pipeline uses this priority: main > staging
 
 ## Best Practices
 
-1. **Always test in dev first** before promoting to staging/prod
+1. **Always test in dev first** before promoting to staging/main
 2. **Use meaningful commit messages** following [Conventional Commits](https://www.conventionalcommits.org/)
 3. **Tag after successful testing** in each environment
 4. **Keep branches in sync** - regularly merge dev → staging → main

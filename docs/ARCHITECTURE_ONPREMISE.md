@@ -30,52 +30,50 @@ graph TB
         Users[Users/Clients]
     end
 
-    subgraph "Azure Cloud"
-        subgraph "Azure Kubernetes Service (AKS)"
-            subgraph "Ingress Layer"
-                Ingress[NGINX Ingress Controller<br/>LoadBalancer Service]
-            end
-
-            subgraph "app-frontend namespace"
-                FE1[Frontend Pod 1<br/>React + Nginx]
-                FE2[Frontend Pod 2<br/>React + Nginx]
-                FE3[Frontend Pod 3<br/>React + Nginx]
-                FESVC[Frontend Service<br/>ClusterIP]
-            end
-
-            subgraph "app-backend namespace"
-                BE1[Backend Pod 1<br/>Flask API]
-                BE2[Backend Pod 2<br/>Flask API]
-                BE3[Backend Pod 3<br/>Flask API]
-                BESVC[Backend Service<br/>ClusterIP]
-
-                PG[PostgreSQL Pod<br/>StatefulSet]
-                PGSVC[PostgreSQL Service<br/>ClusterIP]
-                PGPVC[(PostgreSQL PVC<br/>100Gi Azure Disk)]
-
-                REDIS[Redis Pod<br/>Deployment]
-                REDISSVC[Redis Service<br/>ClusterIP]
-                REDISPVC[(Redis PVC<br/>10Gi Azure Disk)]
-
-                FILEPVC[(Uploaded Files PVC<br/>50Gi Azure Files)]
-            end
-
-            subgraph "shared namespace"
-                FB[Fluent Bit<br/>DaemonSet]
-                PROM[Prometheus<br/>StatefulSet]
-                PROMPVC[(Prometheus PVC<br/>20Gi)]
-            end
+    subgraph "Kubernetes Cluster"
+        subgraph "Ingress Layer"
+            Ingress[NGINX Ingress Controller<br/>LoadBalancer Service]
         end
 
-        subgraph "Azure Managed Services"
-            ACR[Azure Container<br/>Registry]
-            LA[Log Analytics<br/>Workspace]
+        subgraph "app-frontend namespace"
+            FE1[Frontend Pod 1<br/>React + Nginx]
+            FE2[Frontend Pod 2<br/>React + Nginx]
+            FE3[Frontend Pod 3<br/>React + Nginx]
+            FESVC[Frontend Service<br/>ClusterIP]
         end
 
-        subgraph "Storage"
-            DISK[Azure Managed Disks<br/>Premium SSD]
-            FILES[Azure Files<br/>Standard LRS]
+        subgraph "app-backend namespace"
+            BE1[Backend Pod 1<br/>Flask API]
+            BE2[Backend Pod 2<br/>Flask API]
+            BE3[Backend Pod 3<br/>Flask API]
+            BESVC[Backend Service<br/>ClusterIP]
+
+            PG[PostgreSQL Pod<br/>StatefulSet]
+            PGSVC[PostgreSQL Service<br/>ClusterIP]
+            PGPVC[(PostgreSQL PVC<br/>100Gi)]
+
+            REDIS[Redis Pod<br/>Deployment]
+            REDISSVC[Redis Service<br/>ClusterIP]
+            REDISPVC[(Redis PVC<br/>10Gi)]
+
+            FILEPVC[(Uploaded Files PVC<br/>50Gi)]
         end
+
+        subgraph "shared namespace"
+            FB[Fluent Bit<br/>DaemonSet]
+            PROM[Prometheus<br/>StatefulSet]
+            PROMPVC[(Prometheus PVC<br/>20Gi)]
+        end
+
+        subgraph "Persistent Storage"
+            DISK[Block Storage<br/>Premium SSD/SSD]
+            FILES[Shared File Storage<br/>NFS/SMB]
+        end
+    end
+
+    subgraph "External Services"
+        CR[Container Registry<br/>ACR/ECR/Harbor]
+        LA[Log Aggregation<br/>Optional]
     end
 
     Users -->|HTTPS :443| Ingress
@@ -97,22 +95,22 @@ graph TB
     PG -->|Persistent Storage| PGPVC
     REDIS -->|Persistent Storage| REDISPVC
 
-    FB -->|Ship Logs| LA
+    FB -.->|Ship Logs| LA
     PROM -->|Metrics| PROMPVC
 
-    AKS -->|Pull Images| ACR
+    Cluster -.->|Pull Images| CR
 
     PGPVC -.->|Backed by| DISK
     REDISPVC -.->|Backed by| DISK
     FILEPVC -.->|Backed by| FILES
     PROMPVC -.->|Backed by| DISK
 
-    classDef azure fill:#0078D4,stroke:#fff,stroke-width:2px,color:#fff
+    classDef external fill:#888,stroke:#fff,stroke-width:2px,color:#fff
     classDef k8s fill:#326CE5,stroke:#fff,stroke-width:2px,color:#fff
     classDef storage fill:#00BCF2,stroke:#fff,stroke-width:2px,color:#fff
     classDef data fill:#50E6FF,stroke:#fff,stroke-width:2px,color:#000
 
-    class ACR,LA azure
+    class CR,LA external
     class Ingress,FE1,FE2,FE3,BE1,BE2,BE3,FB,PROM,PG,REDIS k8s
     class DISK,FILES storage
     class PGPVC,REDISPVC,FILEPVC,PROMPVC data
@@ -330,7 +328,7 @@ spec:
       name: postgres-data
     spec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: managed-premium
+      storageClassName: default  # Use cluster's default storage class
       resources:
         requests:
           storage: 100Gi
@@ -357,7 +355,7 @@ spec:
 **Resource Usage**:
 - **CPU**: 1-2 cores
 - **Memory**: 2-4Gi
-- **Storage**: 100Gi Premium SSD (500 IOPS)
+- **Storage**: 100Gi (SSD recommended for performance)
 
 **PostgreSQL Configuration** (via ConfigMap):
 ```yaml
@@ -454,7 +452,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: managed-premium
+  storageClassName: default  # Use cluster's default storage class
   resources:
     requests:
       storage: 10Gi
@@ -479,10 +477,10 @@ spec:
 **Resource Usage**:
 - **CPU**: 500m-1 core
 - **Memory**: 2-3Gi
-- **Storage**: 10Gi Premium SSD (for AOF persistence)
+- **Storage**: 10Gi (for AOF persistence)
 
 ### 6. File Storage (PVC)
-**Technology**: Azure Files (SMB)
+**Technology**: Shared File System (NFS/SMB compatible)
 
 **PersistentVolumeClaim**:
 ```yaml
@@ -494,37 +492,32 @@ metadata:
 spec:
   accessModes:
   - ReadWriteMany  # Multiple pods can mount
-  storageClassName: azurefile
+  storageClassName: nfs-client  # Or use cloud provider's RWX storage class
   resources:
     requests:
       storage: 50Gi
 ```
 
-**StorageClass**:
+**Storage Class Examples by Platform**:
 ```yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: azurefile
-provisioner: file.csi.azure.com
-parameters:
-  skuName: Standard_LRS
-reclaimPolicy: Retain
-volumeBindingMode: Immediate
-mountOptions:
-- dir_mode=0777
-- file_mode=0777
-- uid=1000
-- gid=1000
-- mfsymlinks
-- cache=strict
+# Azure: Use azurefile
+storageClassName: azurefile
+
+# AWS: Use EFS storage class
+storageClassName: efs-sc
+
+# GCP: Use Filestore storage class
+storageClassName: filestore-sc
+
+# On-premise: Use NFS client provisioner
+storageClassName: nfs-client
 ```
 
 **Features**:
 - **ReadWriteMany**: All backend pods can access simultaneously
-- **Standard LRS**: Locally redundant storage (cost-effective)
+- **Platform-agnostic**: Works with any RWX-capable storage
 - **Capacity**: 50Gi (can grow as needed)
-- **Performance**: Up to 60 MiB/s throughput
+- **Performance**: Varies by storage provider
 
 ### 7. Monitoring Stack
 
@@ -601,7 +594,7 @@ spec:
       name: data
     spec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: managed-premium
+      storageClassName: default  # Use cluster's default storage class
       resources:
         requests:
           storage: 20Gi
@@ -771,19 +764,35 @@ spec:
 
 ### 3. Cluster Autoscaling
 
-**AKS Cluster Autoscaler**:
-```hcl
-resource "azurerm_kubernetes_cluster_node_pool" "user" {
-  name                  = "user"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size              = "Standard_D4s_v3"
-  enable_auto_scaling  = true
-  min_count            = 2
-  max_count            = 8
-  node_labels = {
-    "workload" = "application"
-  }
-}
+**Kubernetes Cluster Autoscaler** (platform-agnostic):
+```yaml
+# Enable autoscaling at the node pool level
+# Configuration varies by platform:
+
+# Azure AKS: Set via az cli or Terraform
+# AWS EKS: Use Cluster Autoscaler deployment
+# GCP GKE: Enable via gcloud or Terraform
+# On-premise: Configure cluster autoscaler manually
+```
+
+**Example: Generic Cluster Autoscaler Configuration**:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-autoscaler
+  namespace: kube-system
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: cluster-autoscaler
+        image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.27.0
+        command:
+        - ./cluster-autoscaler
+        - --cloud-provider=<your-provider>
+        - --nodes=2:8:<node-group-name>
 ```
 
 **Scaling Triggers**:
@@ -942,26 +951,32 @@ def list_files():
 
 ### 7. Storage Performance
 
-**Premium SSD vs Standard SSD**:
+**Storage Performance Considerations**:
 
-| Storage Class | IOPS | Throughput | Use Case |
-|---------------|------|------------|----------|
-| managed-premium (P15) | 1,100 | 125 MB/s | PostgreSQL, Redis |
-| managed (E15) | 500 | 60 MB/s | General workloads |
-| azurefile (Standard) | 1,000 | 60 MB/s | Shared file storage |
+| Storage Type | Typical IOPS | Typical Throughput | Use Case |
+|--------------|-------------|-------------------|----------|
+| Premium SSD/NVMe | 1,000-5,000 | 100-500 MB/s | PostgreSQL, Redis |
+| Standard SSD | 500-1,000 | 60-125 MB/s | General workloads |
+| Shared Storage (NFS/SMB) | 500-2,000 | 50-200 MB/s | Uploaded files |
 
 **I/O Optimization**:
 ```yaml
-# PostgreSQL with high IOPS
+# PostgreSQL with high-performance storage
 volumeClaimTemplates:
 - metadata:
     name: postgres-data
   spec:
-    storageClassName: managed-premium  # Choose Premium SSD
+    storageClassName: fast-ssd  # Use high-performance storage class
     resources:
       requests:
-        storage: 128Gi  # P15 disk: 1,100 IOPS
+        storage: 128Gi
 ```
+
+**Platform-Specific Performance**:
+- **Azure**: managed-premium (Premium SSD)
+- **AWS**: gp3 (General Purpose SSD v3)
+- **GCP**: pd-ssd (SSD Persistent Disk)
+- **On-premise**: Local NVMe or SAN storage
 
 ## Security Implementation
 
@@ -1364,38 +1379,47 @@ roleRef:
 
 #### Private Container Registry
 ```yaml
-# Create image pull secret
-kubectl create secret docker-registry acr-secret \
-  --docker-server=myacr.azurecr.io \
-  --docker-username=<sp-app-id> \
-  --docker-password=<sp-password> \
+# Create image pull secret (generic for any registry)
+kubectl create secret docker-registry registry-secret \
+  --docker-server=<registry-server> \
+  --docker-username=<username> \
+  --docker-password=<password> \
   --namespace=app-backend
+
+# Examples by platform:
+# Azure ACR: myacr.azurecr.io
+# AWS ECR: 123456789.dkr.ecr.region.amazonaws.com
+# GCP GCR: gcr.io/project-id
+# Harbor: harbor.example.com
 
 # Use in deployment
 spec:
   imagePullSecrets:
-  - name: acr-secret
+  - name: registry-secret
   containers:
   - name: backend
-    image: myacr.azurecr.io/backend:v1.0.0
+    image: <registry-server>/backend:v1.0.0
 ```
 
-**Or use Managed Identity**:
+**Or use Platform-Specific Managed Identity**:
 ```bash
-# Attach ACR to AKS
-az aks update \
-  --resource-group $RG \
-  --name $AKS_NAME \
-  --attach-acr $ACR_NAME
+# Azure: Attach ACR to AKS
+az aks update --attach-acr $ACR_NAME
+
+# AWS: Use IAM roles for service accounts (IRSA)
+eksctl create iamserviceaccount --attach-policy-arn ...
+
+# GCP: Use Workload Identity
+gcloud iam service-accounts add-iam-policy-binding ...
 ```
 
 #### Image Scanning
 ```yaml
-# Trivy scan in CI/CD
+# Trivy scan in CI/CD (generic)
 - name: Run Trivy vulnerability scanner
   uses: aquasecurity/trivy-action@master
   with:
-    image-ref: 'myacr.azurecr.io/backend:${{ github.sha }}'
+    image-ref: '<registry>/<image>:${{ github.sha }}'
     format: 'sarif'
     output: 'trivy-results.sarif'
     severity: 'CRITICAL,HIGH'
@@ -2001,12 +2025,11 @@ spec:
               pg_dump -h postgres-service -U postgres -d ai_saas_db | gzip > $BACKUP_FILE
               echo "Backup complete: $BACKUP_FILE"
 
-              # Upload to Azure Blob Storage (optional)
-              az storage blob upload \
-                --account-name $STORAGE_ACCOUNT \
-                --container-name backups \
-                --name $(basename $BACKUP_FILE) \
-                --file $BACKUP_FILE
+              # Upload to cloud storage (optional - choose your platform)
+              # Azure: az storage blob upload --account-name $STORAGE_ACCOUNT --container-name backups --name $(basename $BACKUP_FILE) --file $BACKUP_FILE
+              # AWS: aws s3 cp $BACKUP_FILE s3://$BUCKET_NAME/backups/
+              # GCP: gsutil cp $BACKUP_FILE gs://$BUCKET_NAME/backups/
+              # S3-compatible: s3cmd put $BACKUP_FILE s3://$BUCKET_NAME/backups/
 
               # Clean up old backups (keep last 7 days)
               find /backups -name "backup-*.sql.gz" -mtime +7 -delete
@@ -2099,29 +2122,38 @@ kubectl cp app-backend/redis-0:/data/dump.rdb ./redis-backup-$(date +%Y%m%d).rdb
 
 ### 4. File Storage Backup
 
-**Azure Files Snapshot**:
+**Platform-Specific Snapshots**:
 ```bash
 #!/bin/bash
-# Create snapshot of Azure Files share
+# Create snapshot of file storage
 
-RESOURCE_GROUP="my-rg"
-STORAGE_ACCOUNT="mystorageaccount"
-SHARE_NAME="uploaded-files"
+# Azure Files
+az storage share snapshot create --account-name $STORAGE_ACCOUNT --name $SHARE_NAME
 
-az storage share snapshot create \
-  --account-name $STORAGE_ACCOUNT \
-  --name $SHARE_NAME \
-  --resource-group $RESOURCE_GROUP
+# AWS EFS
+aws efs create-replication-configuration --source-file-system-id $FS_ID
+
+# GCP Filestore
+gcloud filestore backups create $BACKUP_NAME --instance=$INSTANCE_NAME
+
+# Generic: Use rsync or backup tools
+rsync -av /mnt/uploaded-files /backups/files-$(date +%Y%m%d)/
 ```
 
-**Or use Velero for Kubernetes-native backups**:
+**Or use Velero for Kubernetes-native backups** (recommended):
 ```bash
-# Install Velero
-velero install \
-  --provider azure \
-  --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
-  --bucket velero-backups \
-  --secret-file ./credentials-velero
+# Install Velero (choose your provider)
+# Azure:
+velero install --provider azure --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
+  --bucket velero-backups --secret-file ./credentials-velero
+
+# AWS:
+velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.8.0 \
+  --bucket velero-backups --secret-file ./credentials-velero
+
+# GCP:
+velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.8.0 \
+  --bucket velero-backups --secret-file ./credentials-velero
 
 # Backup namespace
 velero backup create app-backend-backup \
@@ -2170,24 +2202,33 @@ graph TD
 
 ## Cost Analysis
 
-### Monthly Cost Breakdown (On-Premise Mode)
+### Monthly Cost Breakdown (On-Premise Mode - Example using Azure AKS)
 
 | Component | Resources | Cost (USD/month) |
 |-----------|-----------|------------------|
-| **AKS Cluster** | | |
-| - Control Plane | Free tier | $0 |
-| - System nodes (2×D2s_v3) | 2 vCPU, 8GB each | $70 × 2 = $140 |
-| - User nodes (3×D4s_v3) | 4 vCPU, 16GB each | $140 × 3 = $420 |
+| **Kubernetes Cluster** | | |
+| - Control Plane | Managed/Free tier | $0-75* |
+| - System nodes (2 nodes) | 2 vCPU, 8GB each | $70-100 × 2 |
+| - User nodes (3 nodes) | 4 vCPU, 16GB each | $140-200 × 3 |
 | **Storage** | | |
-| - Premium SSD (230Gi) | Postgres + Redis + Prom | $30 |
-| - Azure Files (50Gi) | Uploaded files | $10 |
-| **Load Balancer** | Standard LB | $20 |
-| **Container Registry** | Basic tier | $5 |
-| **Log Analytics** | 5GB/day ingestion | $15 |
-| **Bandwidth** | ~100GB egress | $10 |
-| **Total** | | **~$490/month** |
+| - Block Storage (230Gi) | Postgres + Redis + Prom | $20-50 |
+| - Shared Storage (50Gi) | Uploaded files | $10-30 |
+| **Load Balancer** | External LB | $15-35 |
+| **Container Registry** | Basic/Standard tier | $5-20 |
+| **Log Aggregation** | Optional (5GB/day) | $0-25 |
+| **Bandwidth** | ~100GB egress | $5-15 |
+| **Total (Azure AKS)** | | **~$490-720/month** |
+| **Total (AWS EKS)** | | **~$520-780/month** |
+| **Total (GCP GKE)** | | **~$510-750/month** |
+| **Total (On-Prem K8s)** | | **~$300-500/month**† |
 
-**vs Azure Managed Services**: $1,140/month (~57% cost savings)
+*Control plane costs: Azure AKS (Free), AWS EKS ($73/month), GCP GKE (Free with autopilot)
+†On-premise costs include hardware, power, cooling, and maintenance amortized over 3-5 years
+
+**vs Cloud Managed Services (Database/Cache/Storage)**:
+- Azure: $1,140/month (57% savings)
+- AWS: $1,250/month (59% savings)
+- GCP: $1,100/month (55% savings)
 
 ---
 
@@ -2222,22 +2263,40 @@ graph TD
 
 The on-premise (in-cluster) architecture provides:
 
-✅ **Cost-effective** solution (~$490/month)
-✅ **Full control** over infrastructure
-✅ **Kubernetes-native** design patterns
-✅ **Portable** across any Kubernetes platform
-✅ **Production-ready** with proper HA and monitoring
-✅ **Development-friendly** for dev/test environments
+✅ **Platform-Independent**: Runs on Azure AKS, AWS EKS, GCP GKE, or on-premise Kubernetes
+✅ **Cost-effective**: ~$490-780/month (cloud) or ~$300-500/month (on-premise)
+✅ **Full control** over infrastructure components
+✅ **Kubernetes-native** design patterns and best practices
+✅ **Portable** across any Kubernetes distribution
+✅ **Production-ready** with HA, monitoring, and security
+✅ **Development-friendly** for dev/test/staging environments
 
-**Best For**: Development, testing, staging environments, and production workloads where cost optimization is prioritized over managed service convenience.
+**Best For**:
+- Development, testing, and staging environments
+- Production workloads prioritizing cost optimization
+- Multi-cloud or hybrid cloud deployments
+- Organizations with Kubernetes expertise
+- Edge computing or on-premise requirements
+
+**Supported Platforms**:
+- **Azure**: AKS with Azure storage classes
+- **AWS**: EKS with EBS/EFS storage
+- **GCP**: GKE with PD/Filestore storage
+- **On-Premise**: Any Kubernetes 1.24+ with storage provisioner
 
 **Limitations**:
-- Requires operational expertise for database management
-- Manual backup/restore procedures
-- No built-in automatic scaling for database
-- Higher operational overhead compared to managed services
+- Requires Kubernetes and database operational expertise
+- Manual backup/restore procedures (can be automated with tools)
+- Database scaling requires manual intervention or operators
+- Higher operational overhead vs. fully managed cloud services
+
+**When to Use Cloud Managed Services Instead**:
+- Low operational expertise in database management
+- Need for automatic database backups and point-in-time recovery
+- Require built-in database scaling and high availability
+- Compliance requirements for managed security
 
 ---
 
-**Last Updated**: 2025-01-12
-**Version**: 1.0.0
+**Last Updated**: 2025-01-13
+**Version**: 2.0.0

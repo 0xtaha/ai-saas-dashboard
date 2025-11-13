@@ -115,33 +115,77 @@ Pull Request Created/Updated
 
 ### 2. Continuous Deployment (CD)
 
+**Deployment Strategy:**
+
+The CD pipeline uses a **hybrid deployment strategy** based on the branch:
+
+| Branch | Deployment Trigger | Image Tag Format | Latest Tag? |
+|--------|-------------------|------------------|-------------|
+| **dev** | Every push (no tag required) | `dev-<commit-hash>` | ❌ No |
+| **staging** | Git tag push only | `<git-tag>` (e.g., `v1.0.0-rc.1`) | ✅ Yes |
+| **main** | Git tag push only | `<git-tag>` (e.g., `v1.0.0`) | ✅ Yes |
+
+**Key Points:**
+- ✅ **Dev branch**: Auto-deploys on every push (simplified workflow)
+- ✅ **Staging/Main branches**: Require explicit git tags for controlled releases
+- ✅ **Unique dev images**: Each commit gets a unique image tag for easy tracking
+- ✅ **Production safety**: Main deployments only happen via tags (prevents accidental releases)
+
 **Triggers:**
-- Push to `main` branch
-- Release tags (`v*`)
+- Push to `dev` branch (automatic deployment)
+- Release tags on `staging` or `main` branches (`v*`)
 - Manual workflow dispatch
 
-**Process:**
+**Process - Dev Branch (Auto-deploy):**
 ```
-Code Merged to Main
+Push to dev branch
     │
     ├─▶ Build Phase
     │   ├─ Build backend Docker image
     │   ├─ Build frontend Docker image
-    │   ├─ Tag images with commit SHA
+    │   ├─ Tag images: dev-<8-char-commit-hash>
     │   └─ Scan images for vulnerabilities
     │
     ├─▶ Push Phase
     │   ├─ Login to Azure Container Registry
-    │   ├─ Push backend image
-    │   └─ Push frontend image
+    │   ├─ Push backend image (without latest tag)
+    │   └─ Push frontend image (without latest tag)
     │
     └─▶ Deploy Phase
         ├─ Login to Azure
         ├─ Get AKS credentials
         ├─ Update Kubernetes secrets
+        ├─ Deploy to dev environment
+        ├─ Health check verification
+        └─ Send notification
+```
+
+**Process - Staging/Main Branches (Tag-based):**
+```
+Tag Push (v1.0.0 or v1.0.0-rc.1)
+    │
+    ├─▶ Validate Tag
+    │   └─ Confirm tag is on allowed branch
+    │
+    ├─▶ Build Phase
+    │   ├─ Build backend Docker image
+    │   ├─ Build frontend Docker image
+    │   ├─ Tag images: <git-tag> + latest
+    │   └─ Scan images for vulnerabilities
+    │
+    ├─▶ Push Phase
+    │   ├─ Login to Azure Container Registry
+    │   ├─ Push backend image (with latest tag)
+    │   └─ Push frontend image (with latest tag)
+    │
+    └─▶ Deploy Phase
+        ├─ Login to Azure
+        ├─ Get AKS credentials
+        ├─ Determine environment (staging/main)
+        ├─ Update Kubernetes secrets
         ├─ Apply ConfigMaps
-        ├─ Deploy PostgreSQL (if not exists)
-        ├─ Deploy Redis (if not exists)
+        ├─ Deploy PostgreSQL (if onprem mode)
+        ├─ Deploy Redis (if onprem mode)
         ├─ Deploy Backend (rolling update)
         ├─ Deploy Frontend (rolling update)
         ├─ Apply Ingress rules
@@ -162,6 +206,23 @@ Failure ❌
 ```
 
 **Workflow File:** `.github/workflows/cd.yml`
+
+### Image Tagging Examples
+
+**Dev Environment:**
+- Push commit `a1b2c3d4` to dev branch
+- Image tags: `dev-a1b2c3d4`
+- No `latest` tag applied
+
+**Staging Environment:**
+- Create tag `v1.0.0-rc.1` on staging branch
+- Push tag: `git push origin v1.0.0-rc.1`
+- Image tags: `v1.0.0-rc.1` and `latest`
+
+**Main Environment:**
+- Create tag `v1.0.0` on main branch
+- Push tag: `git push origin v1.0.0`
+- Image tags: `v1.0.0` and `latest`
 
 ## Prerequisites
 
@@ -273,6 +334,8 @@ Add the following secrets:
 |------------|-------------|
 | `SLACK_WEBHOOK` | Slack webhook for notifications |
 
+**Important Note:** The production environment is now called "main" instead of "prod". If you have any manual workflow dispatch configurations, make sure to select "main" when deploying to production.
+
 ### Getting ACR Credentials
 
 ```bash
@@ -346,17 +409,103 @@ az acr credential show --name aisaasacr --query passwords[0].value -o tsv
    - Verifies rollback status
 
 **When it runs:**
-- On push to `main` branch
-- On release tags (v1.0.0, etc.)
+- On push to `dev` branch (auto-deploy)
+- On tag push to `staging` or `main` branches (v1.0.0-rc.1, v1.0.0, etc.)
 - Manual trigger with environment selection
 
 ### Deployment Environments
 
-| Environment | Trigger | Replicas | Autoscaling |
-|------------|---------|----------|-------------|
-| **Dev** | Manual | 1 | No |
-| **Staging** | Push to main | 2 | Yes (2-5) |
-| **Production** | Release tags | 3 | Yes (3-10) |
+| Environment | Branch | Trigger Type | Image Tag Format | Replicas | Autoscaling |
+|------------|--------|--------------|------------------|----------|-------------|
+| **Dev** | dev | Push to branch (auto) | `dev-<commit-hash>` | 1 | No |
+| **Staging** | staging | Tag push only | `v*-rc.*` + latest | 2 | Yes (2-5) |
+| **Main** | main | Tag push only | `v*` + latest | 3 | Yes (3-10) |
+
+**Important Notes:**
+- **Dev environment**: Deploys automatically on every push to the dev branch. No tags required.
+- **Staging environment**: Deploys only when you push a tag like `v1.0.0-rc.1` to the staging branch.
+- **Main environment**: Deploys only when you push a production tag like `v1.0.0` to the main branch (formerly called "prod").
+
+## Deployment Workflows by Environment
+
+### Development Workflow (dev branch)
+
+**No tags required** - Just push to dev branch:
+
+```bash
+# Switch to dev branch
+git checkout dev
+
+# Make your changes and commit
+git add .
+git commit -m "feat: add new feature"
+
+# Push the branch (this automatically triggers deployment)
+git push origin dev
+```
+
+**Result:**
+- Image built and tagged as `dev-<commit-hash>` (e.g., `dev-a1b2c3d4`)
+- Automatically deployed to dev environment
+- No "latest" tag applied
+
+### Staging Workflow (staging branch)
+
+**Tags required** - Create and push a tag:
+
+```bash
+# Merge dev to staging
+git checkout staging
+git merge dev
+
+# Push the branch first
+git push origin staging
+
+# Create a release candidate tag
+git tag v1.0.0-rc.1
+
+# Push the tag (this triggers deployment to staging)
+git push origin v1.0.0-rc.1
+```
+
+**Result:**
+- Image built and tagged as `v1.0.0-rc.1` and `latest`
+- Deployed to staging environment
+
+### Production Workflow (main branch)
+
+**Tags required** - Create and push a tag:
+
+```bash
+# Merge staging to main
+git checkout main
+git merge staging
+
+# Push the branch first
+git push origin main
+
+# Create a production tag
+git tag v1.0.0
+
+# Push the tag (this triggers deployment to main)
+git push origin v1.0.0
+```
+
+**Result:**
+- Image built and tagged as `v1.0.0` and `latest`
+- Deployed to main (production) environment
+
+### What Does NOT Trigger Deployment
+
+❌ Pushing commits to `staging` branch without a tag
+❌ Pushing commits to `main` branch without a tag
+❌ Creating a tag on `dev` branch
+❌ Creating branches
+❌ Opening/merging pull requests
+
+✅ **Deployment Only Happens When**:
+- Push to `dev` branch (automatic, no tag needed)
+- Push a `v*` tag to `staging` or `main` branch
 
 ## Manual Deployment
 
@@ -483,6 +632,43 @@ kubectl get hpa -n ai-saas-dashboard
 
 ## Troubleshooting
 
+### Deployment Issues
+
+#### Dev deployment not triggering
+
+**Check 1: Did you push to dev branch?**
+```bash
+git push origin dev
+```
+
+**Check 2: Check GitHub Actions**
+Navigate to Actions tab and look for workflow runs triggered by push to dev
+
+#### Tag is not triggering deployment (staging/main)
+
+**Check 1: Is the tag on an allowed branch?**
+```bash
+git branch -r --contains v1.0.0
+# Should show: origin/main or origin/staging (not origin/dev)
+```
+
+**Check 2: Did you push the tag?**
+```bash
+git push origin v1.0.0
+```
+
+**Check 3: Check GitHub Actions**
+Navigate to Actions tab and look for workflow runs
+
+#### Wrong environment deployed
+
+The environment is determined by:
+- Push to `dev` branch → dev environment (no tag needed)
+- Tags on `staging` branch → staging environment
+- Tags on `main` branch → main environment
+
+If a tag exists on multiple branches, the pipeline uses this priority: main > staging
+
 ### Common Issues
 
 #### 1. Pod CrashLoopBackOff
@@ -577,6 +763,47 @@ View workflow logs:
 - Go to **Actions** tab
 - Click on workflow run
 - Expand job steps
+
+## Deployment Best Practices
+
+1. **Always test in dev first** before promoting to staging/main
+2. **Use meaningful commit messages** following [Conventional Commits](https://www.conventionalcommits.org/)
+3. **Tag after successful testing** in each environment
+4. **Keep branches in sync** - regularly merge dev → staging → main
+5. **Monitor deployments** - check logs and metrics after deployment
+6. **Test rollback procedures** regularly in dev/staging
+
+### Tag Naming Convention
+
+**Staging Tags (staging branch):**
+```
+v<major>.<minor>.<patch>-rc.<number>
+```
+Examples: `v1.0.0-rc.1`, `v1.2.0-rc.2`
+
+**Production Tags (main branch):**
+```
+v<major>.<minor>.<patch>
+```
+Examples: `v1.0.0`, `v1.2.0`, `v2.0.0`
+
+**Note**: Dev branch does not require tags. Images are automatically tagged with commit hashes.
+
+### Version Numbering
+
+Follow [Semantic Versioning 2.0.0](https://semver.org/):
+
+- **MAJOR** version: Incompatible API changes
+- **MINOR** version: Backward-compatible new features
+- **PATCH** version: Backward-compatible bug fixes
+
+Examples:
+```
+v1.0.0      → Initial release
+v1.0.1      → Patch: Bug fix
+v1.1.0      → Minor: New feature (backward compatible)
+v2.0.0      → Major: Breaking changes
+```
 
 ## Security Best Practices
 

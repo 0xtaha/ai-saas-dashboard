@@ -2,8 +2,10 @@ name: CD - Deploy to Azure AKS
 
 on:
   push:
+    branches:
+      - dev  # Auto-deploy dev on every push (no tag required)
     tags:
-      - 'v*'
+      - 'v*'  # Deploy staging/main on tag push
   workflow_dispatch:
     inputs:
       environment:
@@ -13,7 +15,7 @@ on:
         options:
           - dev
           - staging
-          - prod
+          - main
       deployment_mode:
         description: 'Deployment mode (azure for managed services, onprem for in-cluster)'
         required: true
@@ -53,31 +55,38 @@ jobs:
             exit 0
           fi
 
+          # For push to dev branch (no tag required)
+          if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            echo "✅ Push to dev branch detected"
+            echo "🎯 Deploying to environment: dev"
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "branch=dev" >> $GITHUB_OUTPUT
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           # For tag push, determine which branch the tag is on
           TAG="${GITHUB_REF#refs/tags/}"
           echo "Processing tag: $TAG"
 
           # Find which branch contains this tag
-          BRANCHES=$(git branch -r --contains "$TAG" | grep -E 'origin/(main|staging|dev)' | sed 's/.*origin\///')
+          BRANCHES=$(git branch -r --contains "$TAG" | grep -E 'origin/(main|staging)' | sed 's/.*origin\///')
 
           if [[ -z "$BRANCHES" ]]; then
-            echo "❌ Tag $TAG is not on any of the allowed branches (main, staging, dev)"
+            echo "❌ Tag $TAG is not on any of the allowed branches (main, staging)"
             echo "should_deploy=false" >> $GITHUB_OUTPUT
             exit 1
           fi
 
           # Determine environment based on branch
           if echo "$BRANCHES" | grep -q "^main$"; then
-            ENV="prod"
+            ENV="main"
             BRANCH="main"
           elif echo "$BRANCHES" | grep -q "^staging$"; then
             ENV="staging"
             BRANCH="staging"
-          elif echo "$BRANCHES" | grep -q "^dev$"; then
-            ENV="dev"
-            BRANCH="dev"
           else
-            echo "❌ Tag $TAG is not on any of the allowed branches (main, staging, dev)"
+            echo "❌ Tag $TAG is not on any of the allowed branches (main, staging)"
             echo "should_deploy=false" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -110,14 +119,25 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Extract metadata
+      - name: Extract metadata and determine image tag
         id: meta
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          ENVIRONMENT="${{ needs.check-branch.outputs.environment }}"
+
+          if [[ "$ENVIRONMENT" == "dev" ]]; then
+            # Dev: Use commit hash
+            TAG="dev-${GITHUB_SHA::8}"
+            echo "📦 Dev environment: Using commit hash tag: $TAG"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Staging/Main: Use git tag
             TAG=${GITHUB_REF#refs/tags/}
+            echo "📦 Tagged release: Using git tag: $TAG"
           else
-            TAG=main-${GITHUB_SHA::8}
+            # Fallback (should not happen with current workflow)
+            TAG="${ENVIRONMENT}-${GITHUB_SHA::8}"
+            echo "⚠️  Fallback: Using environment-commit tag: $TAG"
           fi
+
           echo "tags=$TAG" >> $GITHUB_OUTPUT
           echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
@@ -129,7 +149,7 @@ jobs:
           push: true
           tags: |
             ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:${{ env.IMAGE_TAG }}
-            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:latest
+            ${{ needs.check-branch.outputs.environment != 'dev' && format('{0}.azurecr.io/ai-saas-backend:latest', env.AZURE_CONTAINER_REGISTRY) || '' }}
           cache-from: type=registry,ref=${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-backend:latest
           cache-to: type=inline
 
@@ -141,7 +161,7 @@ jobs:
           push: true
           tags: |
             ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:${{ env.IMAGE_TAG }}
-            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:latest
+            ${{ needs.check-branch.outputs.environment != 'dev' && format('{0}.azurecr.io/ai-saas-frontend:latest', env.AZURE_CONTAINER_REGISTRY) || '' }}
           cache-from: type=registry,ref=${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/ai-saas-frontend:latest
           cache-to: type=inline
 

@@ -162,12 +162,21 @@ ai-saas-dashboard/
 │       ├── deploy-with-mode.sh    # Mode-aware deployment
 │       └── setup-azure.sh         # Azure resource setup
 │
+├── docs/                           # Documentation
+│   ├── ARCHITECTURE_AZURE.md      # Azure architecture guide
+│   ├── ARCHITECTURE_ONPREMISE.md  # On-premise architecture guide
+│   ├── CICD_README.md             # CI/CD documentation
+│   ├── DEPLOYMENT_MODES.md        # Deployment modes guide
+│   ├── DOCKER_GUIDE.md            # Docker development guide
+│   ├── MIGRATION_GUIDE.md         # Migration guide
+│   ├── NAMESPACE_ARCHITECTURE.md  # Multi-namespace docs
+│   ├── QUICK_START.md             # Quick start guide
+│   ├── QUICKSTART_CICD.md         # CI/CD quick start
+│   ├── RELEASE_PROCESS.md         # Release and tagging strategy
+│   └── STRUCTURE.md               # Project structure details
+│
 ├── docker-compose.yml             # Local development
 ├── docker-compose.prod.yml        # Production overrides
-├── DEPLOYMENT_MODES.md            # Deployment modes guide
-├── QUICK_START.md                 # Quick start guide
-├── NAMESPACE_ARCHITECTURE.md      # Multi-namespace docs
-├── CICD_README.md                 # CI/CD documentation
 └── README.md                      # This file
 ```
 
@@ -234,18 +243,24 @@ Access the application:
 ## 📚 Documentation
 
 ### Getting Started
-- **[Quick Start Guide](QUICK_START.md)** - Get started quickly with common commands
-- **[Deployment Modes](DEPLOYMENT_MODES.md)** - Detailed comparison and setup for both modes
-- **[Release Process](RELEASE_PROCESS.md)** - Git tagging strategy and deployment workflow
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get started quickly with common commands
+- **[CI/CD Quick Start](docs/QUICKSTART_CICD.md)** - Fast-track CI/CD setup
+- **[Docker Development Guide](docs/DOCKER_GUIDE.md)** - Local development with Docker Compose
+
+### Deployment & Operations
+- **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - Detailed comparison of Azure vs On-Premise modes
+- **[Release Process](docs/RELEASE_PROCESS.md)** - Git tagging strategy and deployment workflow
+- **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Migrating between deployment modes
 
 ### Architecture & Design
-- **[Azure Architecture](docs/ARCHITECTURE_AZURE.md)** - Complete Azure managed services architecture with Mermaid diagrams
-- **[On-Premise Architecture](docs/ARCHITECTURE_ONPREMISE.md)** - In-cluster deployment architecture with scalability and security details
-- **[Namespace Architecture](NAMESPACE_ARCHITECTURE.md)** - Multi-namespace design and patterns
+- **[Azure Architecture](docs/ARCHITECTURE_AZURE.md)** - Complete Azure managed services architecture with diagrams
+- **[On-Premise Architecture](docs/ARCHITECTURE_ONPREMISE.md)** - Platform-independent in-cluster deployment architecture
+- **[Namespace Architecture](docs/NAMESPACE_ARCHITECTURE.md)** - Multi-namespace design patterns
+- **[Project Structure](docs/STRUCTURE.md)** - Detailed project organization
 
 ### Infrastructure & CI/CD
 - **[Terraform Infrastructure](infra/terraform/README.md)** - Infrastructure as Code documentation
-- **[CI/CD Pipeline](CICD_README.md)** - GitHub Actions workflow documentation
+- **[CI/CD Pipeline](docs/CICD_README.md)** - Complete GitHub Actions workflow guide
 
 ## 🔧 Configuration
 
@@ -465,10 +480,17 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## 👥 Support
 
-- **Documentation:** See `/docs` folder for detailed guides
+- **Documentation:** See [`docs/`](docs/) folder for comprehensive guides
 - **Issues:** Report bugs via GitHub Issues
 - **Discussions:** Use GitHub Discussions for questions
 - **Email:** support@example.com
+
+### Documentation Index
+All documentation is available in the [`docs/`](docs/) directory:
+- Architecture guides (Azure & On-Premise)
+- Deployment and operations guides
+- CI/CD pipeline documentation
+- Quick start and migration guides
 
 ## 🗺️ Roadmap
 
