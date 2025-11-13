@@ -5,6 +5,10 @@ FROM node:18-alpine as build
 
 WORKDIR /app
 
+# Accept build argument for API URL
+ARG REACT_APP_API_URL=/api
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Copy package files
 COPY package*.json ./
 
